@@ -1,0 +1,2327 @@
+<!doctype html>
+<html lang="en" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>ArmCtl — Pico W Robotic Arm</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23f26b1d'/%3E%3Cpath d='M16 50h20M26 50V34l12-14 10 6' stroke='white' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script>
+  // Apply saved theme before first paint (avoids a flash of the wrong theme)
+  try { const c = JSON.parse(localStorage.getItem('armctl.cfg') || '{}'); if (c.theme) document.documentElement.dataset.theme = c.theme; } catch (e) {}
+</script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<style>
+:root {
+  --bg: #eef1f5; --panel: #ffffff; --panel2: #f5f7fa; --text: #16202b; --muted: #5d6b7b; --border: #d8dee6;
+  --accent: #f26b1d; --accent-weak: rgba(242,107,29,.12); --blue: #2f7cf6; --blue-weak: rgba(47,124,246,.12);
+  --ok: #1f9d55; --warn: #c27c00; --danger: #e03e3e; --danger-weak: rgba(224,62,62,.12);
+  --scene-bg: #e7ebf0; --grid1: #8c99a8; --grid2: #c9d1da;
+  --shadow: 0 1px 2px rgba(16,24,40,.05), 0 2px 6px rgba(16,24,40,.06);
+  --radius: 12px; --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+:root[data-theme="dark"] {
+  --bg: #0d1014; --panel: #161a20; --panel2: #1c2128; --text: #e5e9ef; --muted: #8b96a5; --border: #2a313b;
+  --accent: #ff7d33; --accent-weak: rgba(255,125,51,.15); --blue: #5b9cff; --blue-weak: rgba(91,156,255,.15);
+  --ok: #3cc97a; --warn: #f0b429; --danger: #ff5c5c; --danger-weak: rgba(255,92,92,.15);
+  --scene-bg: #12161c; --grid1: #4a5562; --grid2: #262d36;
+  --shadow: 0 1px 2px rgba(0,0,0,.4);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="auto"] {
+    --bg: #0d1014; --panel: #161a20; --panel2: #1c2128; --text: #e5e9ef; --muted: #8b96a5; --border: #2a313b;
+    --accent: #ff7d33; --accent-weak: rgba(255,125,51,.15); --blue: #5b9cff; --blue-weak: rgba(91,156,255,.15);
+    --ok: #3cc97a; --warn: #f0b429; --danger: #ff5c5c; --danger-weak: rgba(255,92,92,.15);
+    --scene-bg: #12161c; --grid1: #4a5562; --grid2: #262d36;
+    --shadow: 0 1px 2px rgba(0,0,0,.4);
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; accent-color: var(--accent); }
+h1, h2, h3, h4 { margin: 0; font-weight: 650; }
+h3 { font-size: 15px; }
+h4 { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin: 14px 0 8px; }
+p { margin: 6px 0; }
+a { color: var(--blue); }
+kbd { font: 11px var(--mono); padding: 1px 5px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; background: var(--panel2); }
+code { font-family: var(--mono); font-size: 12px; background: var(--panel2); padding: 1px 4px; border-radius: 4px; }
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+.mono { font-family: var(--mono); }
+
+/* ---------- header ---------- */
+header { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--border); }
+.brand { display: flex; align-items: center; gap: 10px; margin-right: auto; }
+.brand .logo { width: 30px; height: 30px; border-radius: 8px; background: var(--accent); display: grid; place-items: center; }
+.brand h1 { font-size: 17px; }
+.brand span { font-size: 12px; color: var(--muted); display: block; margin-top: -2px; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border); font-size: 12px; background: var(--panel2); white-space: nowrap; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.dot.ok { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 25%, transparent); }
+.dot.warn { background: var(--warn); }
+.dot.err { background: var(--danger); }
+
+/* ---------- controls ---------- */
+.btn { appearance: none; border: 1px solid var(--border); background: var(--panel2); color: var(--text); padding: 7px 12px; border-radius: 8px;
+  font: inherit; font-weight: 550; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; }
+.btn:hover { border-color: color-mix(in srgb, var(--text) 30%, var(--border)); }
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.blue { background: var(--blue); border-color: var(--blue); color: #fff; }
+.btn.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+.btn.ghost { background: transparent; }
+.btn.sm { padding: 4px 8px; font-size: 12px; border-radius: 6px; }
+.btn.icon { width: 30px; height: 30px; padding: 0; }
+#themeBtn { width: 36px; height: 36px; font-size: 18px; }
+.estop { background: var(--danger); color: #fff; border: 0; font-weight: 800; letter-spacing: .05em; padding: 8px 16px; border-radius: 8px; cursor: pointer; box-shadow: 0 0 0 3px var(--danger-weak); }
+.estop.active { background: #fff; color: var(--danger); animation: blink 1s infinite; }
+@keyframes blink { 50% { box-shadow: 0 0 0 6px var(--danger-weak); } }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 9px; padding: 2px; background: var(--panel2); }
+.seg button { border: 0; background: transparent; color: var(--muted); font: inherit; font-weight: 600; padding: 5px 11px; border-radius: 7px; cursor: pointer; }
+.seg button.on { background: var(--panel); color: var(--text); box-shadow: var(--shadow); }
+.seg button.on.sim { color: var(--blue); }
+.seg button.on.live { color: var(--accent); }
+input[type=number], input[type=text], input[type=password], select, textarea {
+  font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--border); border-radius: 7px; padding: 6px 8px; min-width: 0; }
+input:focus, select:focus, textarea:focus, .btn:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 60%, transparent); outline-offset: 1px; }
+input[type=number] { width: 78px; }
+input[type=range] { width: 100%; min-width: 0; }
+input[type=color] { width: 44px; height: 32px; padding: 2px; border: 1px solid var(--border); border-radius: 7px; background: var(--panel); }
+label.chk { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; user-select: none; }
+.row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.row.end { justify-content: flex-end; }
+.grow { flex: 1; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px 14px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px 14px; }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field > span { font-size: 12px; color: var(--muted); }
+.field input[type=number], .field select, .field input[type=text], .field input[type=password] { width: 100%; }
+.note { padding: 10px 12px; border-radius: 9px; background: var(--blue-weak); border: 1px solid color-mix(in srgb, var(--blue) 30%, transparent); font-size: 13px; }
+.note.warn { background: color-mix(in srgb, var(--warn) 13%, transparent); border-color: color-mix(in srgb, var(--warn) 40%, transparent); }
+.note.err { background: var(--danger-weak); border-color: color-mix(in srgb, var(--danger) 40%, transparent); }
+.note.ok { background: color-mix(in srgb, var(--ok) 12%, transparent); border-color: color-mix(in srgb, var(--ok) 35%, transparent); }
+
+/* ---------- layout ---------- */
+main { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(380px, 1fr); gap: 16px; padding: 16px; max-width: 1760px; margin: 0 auto; }
+.viewer { position: sticky; top: 74px; height: calc(100vh - 90px); min-height: 440px; border-radius: var(--radius); overflow: hidden;
+  background: var(--scene-bg); border: 1px solid var(--border); box-shadow: var(--shadow); }
+.viewer canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.side { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.tabs { display: flex; gap: 4px; overflow-x: auto; padding: 4px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); scrollbar-width: thin; }
+.tabs button { border: 0; background: transparent; color: var(--muted); font: inherit; font-weight: 600; padding: 7px 12px; border-radius: 8px; cursor: pointer; white-space: nowrap; }
+.tabs button:hover { color: var(--text); }
+.tabs button.on { background: var(--accent-weak); color: var(--accent); }
+.panel { display: none; flex-direction: column; gap: 12px; }
+.panel.on { display: flex; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; box-shadow: var(--shadow); min-width: 0; }
+.card > .head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.card > .head h3 { margin-right: auto; }
+@media (max-width: 1020px) {
+  main { grid-template-columns: 1fr; padding: 10px; }
+  .viewer { position: relative; top: 0; height: 52vh; min-height: 320px; }
+}
+@media (max-width: 520px) {
+  .grid3 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  header { padding: 8px 10px; }
+  .brand span { display: none; }
+}
+
+/* ---------- viewer overlay ---------- */
+.ov { position: absolute; pointer-events: none; font-size: 12px; }
+.ov > * { pointer-events: auto; }
+.ov.tl { top: 10px; left: 10px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.ov.tr { top: 10px; right: 10px; display: flex; gap: 4px; }
+.ov.bl { bottom: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; align-items: flex-end; gap: 8px; flex-wrap: wrap; pointer-events: none; }
+.ov.tc { top: 10px; left: 50%; transform: translateX(-50%); }
+.glass { background: color-mix(in srgb, var(--panel) 82%, transparent); backdrop-filter: blur(6px); border: 1px solid var(--border); border-radius: 9px; padding: 6px 9px; }
+.badge { font-weight: 800; letter-spacing: .06em; font-size: 11px; padding: 4px 9px; border-radius: 6px; color: #fff; }
+.badge.sim { background: var(--blue); }
+.badge.live { background: var(--accent); }
+.readout { font-family: var(--mono); font-size: 12px; display: grid; grid-template-columns: auto auto; gap: 1px 10px; }
+.readout b { color: var(--muted); font-weight: 500; }
+.warnbox { color: #fff; background: var(--danger); border-radius: 7px; padding: 5px 9px; font-weight: 600; display: none; }
+.hud { text-align: center; font-weight: 600; display: none; }
+.hud big { font-size: 20px; display: block; }
+
+/* ---------- joints ---------- */
+.jrow { padding: 8px 0; border-bottom: 1px dashed var(--border); }
+.jrow:last-child { border-bottom: 0; }
+.jhead { display: flex; align-items: baseline; gap: 8px; font-size: 13px; margin-bottom: 4px; }
+.jname { font-weight: 650; }
+.jlim { margin-left: auto; color: var(--muted); font-size: 11px; font-family: var(--mono); }
+.jtype { font-size: 10px; padding: 1px 5px; border-radius: 4px; background: var(--panel2); border: 1px solid var(--border); color: var(--muted); }
+.jctl { display: grid; grid-template-columns: 30px minmax(0,1fr) 30px 70px; gap: 6px; align-items: center; }
+.jctl input[type=number] { width: 70px; }
+.jnow { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.ikgrid { display: grid; grid-template-columns: 52px minmax(0,1fr) 76px; gap: 6px 8px; align-items: center; }
+.ikgrid label { font-weight: 650; font-size: 13px; }
+.jog { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 6px; }
+.status { font-size: 12px; padding: 6px 9px; border-radius: 7px; background: var(--panel2); border: 1px solid var(--border); }
+.status.ok { color: var(--ok); }
+.status.err { color: var(--danger); }
+.list { display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow: auto; }
+.item { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel2); }
+.item .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 550; }
+.item.playing { border-color: var(--accent); background: var(--accent-weak); }
+.empty { color: var(--muted); font-size: 12px; text-align: center; padding: 8px; }
+
+/* ---------- tables / calibration / pins ---------- */
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 6px 6px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+th { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
+td input[type=number] { width: 70px; }
+.tablewrap { overflow-x: auto; }
+details.servo { border: 1px solid var(--border); border-radius: 10px; background: var(--panel2); }
+details.servo + details.servo { margin-top: 8px; }
+details.servo summary { cursor: pointer; padding: 10px 12px; display: flex; align-items: center; gap: 8px; list-style: none; font-weight: 600; }
+details.servo summary::-webkit-details-marker { display: none; }
+details.servo summary::before { content: "▸"; color: var(--muted); transition: transform .15s; }
+details.servo[open] summary::before { transform: rotate(90deg); }
+details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: column; gap: 10px; }
+.tag { font-size: 11px; font-family: var(--mono); padding: 1px 6px; border-radius: 5px; background: var(--panel); border: 1px solid var(--border); color: var(--muted); font-weight: 500; }
+.tag.err { color: var(--danger); border-color: var(--danger); }
+.tag.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 50%, transparent); }
+.pinout { width: 100%; max-width: 520px; display: block; margin: 0 auto; }
+.pinout text { font-family: var(--mono); font-size: 9.5px; fill: var(--muted); }
+.pinout .lbl { fill: var(--text); font-weight: 700; font-size: 10px; }
+
+/* ---------- LEDs ---------- */
+.strip { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px; border-radius: 10px; background: #0b0d10; justify-content: center; min-height: 46px; }
+.led { width: 18px; height: 18px; border-radius: 50%; background: #222; box-shadow: 0 0 0 1px #333 inset; }
+.swatches { display: flex; gap: 6px; flex-wrap: wrap; }
+.swatch { width: 26px; height: 26px; border-radius: 7px; border: 1px solid var(--border); cursor: pointer; }
+
+/* ---------- console ---------- */
+.console { font-family: var(--mono); font-size: 11.5px; height: 180px; overflow: auto; background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; padding: 8px; white-space: pre-wrap; word-break: break-all; }
+.console .tx { color: var(--blue); }
+.console .rx { color: var(--ok); }
+.console .er { color: var(--danger); }
+.toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%) translateY(20px); opacity: 0; transition: .2s; z-index: 50;
+  background: var(--text); color: var(--bg); padding: 9px 16px; border-radius: 9px; font-weight: 550; pointer-events: none; max-width: 90vw; }
+.toast.show { opacity: 1; transform: translateX(-50%); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="logo"><svg width="20" height="20" viewBox="0 0 64 64"><path d="M10 54h26M22 54V34l14-16 14 8" stroke="#fff" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <div><h1>ArmCtl</h1><span>6-axis arm · Raspberry Pi Pico W</span></div>
+  </div>
+  <div class="seg" id="modeSeg" title="Simulator mode never sends anything to the arm">
+    <button data-mode="sim">Simulator</button>
+    <button data-mode="live">Live</button>
+  </div>
+  <span class="pill" id="connPill"><span class="dot" id="connDot"></span><span id="connText">Disconnected</span></span>
+  <button class="btn" id="connBtn">Connect</button>
+  <button class="btn icon" id="themeBtn" title="Theme: auto / light / dark"></button>
+  <button class="estop" id="estopBtn" title="Emergency stop (Esc)">E-STOP</button>
+</header>
+
+<main>
+  <section class="viewer" id="viewer">
+    <canvas id="scene"></canvas>
+    <div class="ov tl">
+      <span class="badge sim" id="modeBadge">SIMULATOR</span>
+      <div class="glass readout" id="readout"></div>
+      <div class="warnbox" id="warnBox"></div>
+    </div>
+    <div class="ov tc"><div class="glass hud" id="hud"></div></div>
+    <div class="ov tr">
+      <button class="btn sm" data-cam="iso">3D</button>
+      <button class="btn sm" data-cam="front">Front</button>
+      <button class="btn sm" data-cam="side">Side</button>
+      <button class="btn sm" data-cam="top">Top</button>
+    </div>
+    <div class="ov bl">
+      <div class="glass small muted" id="viewHint">Drag to orbit · scroll to zoom · right-drag to pan · <b>Shift+click</b> floor to set IK target</div>
+    </div>
+  </section>
+
+  <section class="side">
+    <nav class="tabs" id="tabs">
+      <button data-tab="control" class="on">Control</button>
+      <button data-tab="sim">Simulator</button>
+      <button data-tab="calib">Calibration</button>
+      <button data-tab="pins">Pin assignments</button>
+      <button data-tab="leds">NeoPixel</button>
+      <button data-tab="settings">Settings</button>
+    </nav>
+
+    <!-- ================= CONTROL ================= -->
+    <div class="panel on" id="tab-control">
+      <div class="card">
+        <div class="head"><h3>Joint control</h3>
+          <button class="btn sm" id="homeBtn">Home</button>
+          <button class="btn sm" id="gripOpen">Open</button>
+          <button class="btn sm" id="gripClose">Close</button>
+        </div>
+        <div id="jointRows"></div>
+        <div class="row" style="margin-top:10px">
+          <span class="small muted" style="width:52px">Speed</span>
+          <input type="range" min="5" max="100" step="1" data-bind="speed" class="grow">
+          <span class="mono small" id="speedVal" style="width:40px;text-align:right"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="head"><h3>Inverse kinematics</h3>
+          <label class="chk small"><input type="checkbox" id="ikLive" checked> Live</label>
+          <button class="btn sm" id="ikSync" title="Copy the arm's current tool position into the IK fields">Sync from arm</button>
+        </div>
+        <div class="ikgrid">
+          <label for="ikX">X</label><input type="range" id="ikXr" step="1"><input type="number" id="ikX" step="1">
+          <label for="ikY">Y</label><input type="range" id="ikYr" step="1"><input type="number" id="ikY" step="1">
+          <label for="ikZ">Z</label><input type="range" id="ikZr" step="1"><input type="number" id="ikZ" step="1">
+          <label for="ikP">Pitch</label><input type="range" id="ikPr" min="-90" max="90" step="1"><input type="number" id="ikP" step="1">
+        </div>
+        <div class="row" style="margin:10px 0">
+          <label class="chk small"><input type="checkbox" id="ikLock"> Hold tool pitch</label>
+          <span class="grow"></span>
+          <span class="small muted">mm · degrees</span>
+          <button class="btn sm primary" id="ikGo">Move to target</button>
+        </div>
+        <div class="row small" style="margin-bottom:6px">
+          <span class="muted">Jog step</span>
+          <select id="jogStep"><option>1</option><option>5</option><option selected>10</option><option>25</option><option>50</option></select>
+          <span class="muted">mm</span>
+        </div>
+        <div class="jog">
+          <button class="btn sm" data-jog="x,-1">X−</button><button class="btn sm" data-jog="x,1">X+</button>
+          <button class="btn sm" data-jog="y,-1">Y−</button><button class="btn sm" data-jog="y,1">Y+</button>
+          <button class="btn sm" data-jog="z,-1">Z−</button><button class="btn sm" data-jog="z,1">Z+</button>
+        </div>
+        <div class="status" id="ikStatus" style="margin-top:10px">Set a target in millimetres. X = forward, Y = left, Z = up from the table.</div>
+      </div>
+
+      <div class="card">
+        <div class="head"><h3>Poses &amp; sequences</h3></div>
+        <div class="row" style="margin-bottom:8px">
+          <input type="text" id="poseName" placeholder="Pose name" class="grow">
+          <button class="btn sm primary" id="poseSave">Save current pose</button>
+        </div>
+        <div class="list" id="poseList"></div>
+        <h4>Sequence</h4>
+        <div class="list" id="seqList"></div>
+        <div class="row" style="margin-top:8px">
+          <button class="btn sm primary" id="seqPlay">▶ Play</button>
+          <button class="btn sm" id="seqStop">■ Stop</button>
+          <label class="chk small"><input type="checkbox" data-bind="seqLoop"> Loop</label>
+          <span class="grow"></span>
+          <span class="small muted">Dwell</span>
+          <input type="number" min="0" step="100" data-bind="seqDwell" style="width:74px"><span class="small muted">ms</span>
+          <button class="btn sm ghost" id="seqClear">Clear</button>
+        </div>
+      </div>
+
+      <div class="card small">
+        <div class="head"><h3>Keyboard</h3></div>
+        <div class="grid2">
+          <div><kbd>Q</kbd>/<kbd>A</kbd> base · <kbd>W</kbd>/<kbd>S</kbd> shoulder<br><kbd>E</kbd>/<kbd>D</kbd> elbow · <kbd>R</kbd>/<kbd>F</kbd> wrist yaw<br><kbd>T</kbd>/<kbd>G</kbd> roll · <kbd>Y</kbd>/<kbd>H</kbd> gripper</div>
+          <div><kbd>←</kbd><kbd>→</kbd> IK Y · <kbd>↑</kbd><kbd>↓</kbd> IK X<br><kbd>PgUp</kbd>/<kbd>PgDn</kbd> IK Z<br><kbd>Home</kbd> home pose · <kbd>Esc</kbd> E-stop</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= SIMULATOR ================= -->
+    <div class="panel" id="tab-sim">
+      <div class="card">
+        <div class="head"><h3>Simulator mode</h3><span class="tag" id="simTag"></span></div>
+        <p class="muted">In simulator mode nothing is sent to the Pico — the 3D arm moves with realistic servo speeds so you can practise safely. Every control (joints, IK, poses, keyboard) works the same as in live mode.</p>
+        <div class="row" style="margin-top:8px">
+          <button class="btn blue" id="simEnter">Switch to simulator</button>
+          <label class="chk"><input type="checkbox" data-bind="sim.realistic"> Realistic servo speed</label>
+          <label class="chk"><input type="checkbox" data-bind="sim.ghost"> Show commanded-pose ghost</label>
+          <label class="chk"><input type="checkbox" data-bind="view.trail"> Tool trail</label>
+        </div>
+      </div>
+      <div class="card">
+        <div class="head"><h3>Practice: reach the targets</h3></div>
+        <p class="muted small">Glowing spheres appear inside the arm's workspace. Move the gripper tip into each one (any control method) and hold it there briefly.</p>
+        <div class="row">
+          <span class="small muted">Targets</span>
+          <select id="pracReachN"><option>5</option><option selected>10</option><option>20</option></select>
+          <span class="small muted">Tolerance</span>
+          <input type="number" min="3" max="60" data-bind="sim.tolerance" style="width:64px"><span class="small muted">mm</span>
+          <span class="grow"></span>
+          <button class="btn primary" id="pracReach">Start</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="head"><h3>Practice: match the pose</h3></div>
+        <p class="muted small">A ghost arm shows a random pose. Match every joint (and the gripper) using the joint sliders or keyboard.</p>
+        <div class="row">
+          <span class="small muted">Poses</span>
+          <select id="pracPoseN"><option>3</option><option selected>5</option><option>10</option></select>
+          <span class="small muted">Tolerance</span>
+          <input type="number" min="2" max="30" data-bind="sim.poseTol" style="width:64px"><span class="small muted">°</span>
+          <span class="grow"></span>
+          <button class="btn primary" id="pracPose">Start</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="head"><h3>Results</h3><button class="btn sm ghost" id="pracReset">Reset best times</button></div>
+        <div id="pracResults" class="small"></div>
+      </div>
+    </div>
+
+    <!-- ================= CALIBRATION ================= -->
+    <div class="panel" id="tab-calib">
+      <div class="card">
+        <div class="head"><h3>How to calibrate</h3></div>
+        <ol class="small" style="margin:0;padding-left:18px">
+          <li>Switch to <b>Live</b> and connect. Calibrate one servo at a time with the arm supported by hand.</li>
+          <li>For the two shoulder servos, remove one horn while calibrating the other so they never fight each other.</li>
+          <li>Use <b>Direct drive</b> to find the servo angle where the joint is at its zero position, then set it as <b>Center</b>.</li>
+          <li>If a joint moves the wrong way, tick <b>Invert</b>. Shoulder B is normally inverted (mirrored mount).</li>
+          <li>Set <b>Min/Max angle</b> to the safe mechanical range of that servo — commands are always clamped to it.</li>
+        </ol>
+      </div>
+      <div class="card">
+        <div class="head"><h3>Servos</h3><button class="btn sm" id="calRelease">Release direct drive</button></div>
+        <div id="calServos"></div>
+      </div>
+      <div class="card">
+        <div class="head"><h3>Joint limits &amp; home</h3><button class="btn sm" id="setHome">Use current pose as home</button></div>
+        <div class="tablewrap"><table id="limitTable"></table></div>
+        <p class="small muted">Joint zero positions: base faces forward, shoulder upper-arm vertical, elbow forearm at 90° to the upper arm, wrist straight, roll level. Gripper is 0 % (closed) … 100 % (open).</p>
+      </div>
+      <div class="card">
+        <div class="head"><h3>Arm geometry</h3></div>
+        <div class="grid3">
+          <label class="field"><span>Base → shoulder axis (mm)</span><input type="number" min="20" max="400" data-bind="geometry.H"></label>
+          <label class="field"><span>Shoulder → elbow (mm)</span><input type="number" min="20" max="400" data-bind="geometry.L1"></label>
+          <label class="field"><span>Elbow → wrist (mm)</span><input type="number" min="20" max="400" data-bind="geometry.L2"></label>
+          <label class="field"><span>Wrist → roll (mm)</span><input type="number" min="10" max="200" data-bind="geometry.Lw"></label>
+          <label class="field"><span>Roll → gripper tip (mm)</span><input type="number" min="30" max="300" data-bind="geometry.Lg"></label>
+          <label class="field"><span>Wrist "yaw" joint axis</span>
+            <select data-bind="wristMode"><option value="yaw">Side-to-side (true yaw)</option><option value="pitch">Up-down (pitch)</option></select></label>
+        </div>
+        <p class="small muted">Lengths are measured between joint axes and are used by the 3D preview and the IK solver. Pick "Up-down" if your wrist servo tilts the gripper up and down.</p>
+      </div>
+      <div class="card">
+        <div class="head"><h3>Servo speeds</h3></div>
+        <div class="grid2">
+          <label class="field"><span>MG996R max speed (°/s at 100 %)</span><input type="number" min="20" max="900" data-bind="typeSpeed.MG996R"></label>
+          <label class="field"><span>MG90S max speed (°/s at 100 %)</span><input type="number" min="20" max="900" data-bind="typeSpeed.MG90S"></label>
+        </div>
+        <div class="row end" style="margin-top:12px"><button class="btn sm ghost" id="calReset">Reset calibration to defaults</button></div>
+      </div>
+    </div>
+
+    <!-- ================= PINS ================= -->
+    <div class="panel" id="tab-pins">
+      <div class="card">
+        <div class="head"><h3>Pin assignments</h3><span class="tag" id="pinState"></span></div>
+        <div class="tablewrap"><table id="pinTable"></table></div>
+        <div id="pinMsgs" style="margin-top:10px;display:flex;flex-direction:column;gap:6px"></div>
+        <div class="row" style="margin-top:12px">
+          <label class="chk small"><input type="checkbox" id="pinSave" checked> Save on the Pico (survives reboot)</label>
+          <span class="grow"></span>
+          <button class="btn sm ghost" id="pinDefaults">Defaults</button>
+          <button class="btn sm primary" id="pinApply">Send to Pico</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="head"><h3>Pico W pinout</h3><span class="small muted">top view, USB at the top</span></div>
+        <svg class="pinout" id="pinout" viewBox="0 0 520 330"></svg>
+      </div>
+      <div class="card small">
+        <div class="head"><h3>Wiring notes</h3></div>
+        <ul style="margin:0;padding-left:18px">
+          <li>Power the servos from a separate 5–6 V supply (≥ 5 A for four MG996R). Never from the Pico's VBUS/3V3.</li>
+          <li>Connect the servo supply ground to a Pico <b>GND</b> pin — the signal needs a common ground.</li>
+          <li>GP23, GP24, GP25 and GP29 are used by the Pico W's wireless chip and can't be assigned.</li>
+          <li>GPn and GPn+16 share one PWM output (e.g. GP0 &amp; GP16), so two servos can't use both.</li>
+          <li>NeoPixels run on PIO, so any free GPIO works. A 330 Ω resistor in the data line is recommended.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ================= NEOPIXEL ================= -->
+    <div class="panel" id="tab-leds">
+      <div class="card">
+        <div class="head"><h3>Preview</h3><label class="chk small"><input type="checkbox" data-bind="led.enabled"> Enabled</label></div>
+        <div class="strip" id="ledStrip"></div>
+      </div>
+      <div class="card">
+        <div class="head"><h3>Hardware</h3></div>
+        <div class="grid3">
+          <label class="field"><span>LED type</span><select data-bind="led.type" id="ledType"></select></label>
+          <label class="field"><span>Data pin</span><select data-bind="led.pin" data-num id="ledPin"></select></label>
+          <label class="field"><span>Number of LEDs</span><input type="number" min="1" max="300" data-bind="led.count"></label>
+          <label class="field"><span>Color order</span><select data-bind="led.order" id="ledOrder"></select></label>
+          <label class="field"><span>Channels</span><select data-bind="led.bpp" data-num id="ledBpp"><option value="3">RGB (3)</option><option value="4">RGBW (4)</option></select></label>
+          <label class="field"><span>Data rate</span><select data-bind="led.khz" data-num><option value="800">800 kHz</option><option value="400">400 kHz</option></select></label>
+        </div>
+        <p class="small muted" id="ledTypeInfo"></p>
+      </div>
+      <div class="card">
+        <div class="head"><h3>Color &amp; effect</h3></div>
+        <div class="grid2">
+          <label class="field"><span>Effect</span>
+            <select data-bind="led.mode">
+              <option value="status">Status (shows arm state)</option><option value="solid">Solid</option><option value="breathe">Breathe</option>
+              <option value="rainbow">Rainbow</option><option value="chase">Chase</option><option value="gradient">Gradient</option><option value="off">Off</option>
+            </select></label>
+          <div class="row" style="align-items:flex-end">
+            <label class="field"><span>Primary</span><input type="color" data-bind="led.color1"></label>
+            <label class="field"><span>Secondary</span><input type="color" data-bind="led.color2"></label>
+          </div>
+          <label class="field"><span>Brightness <b id="ledBriVal"></b></span><input type="range" min="0" max="255" data-bind="led.brightness"></label>
+          <label class="field"><span>Effect speed <b id="ledSpdVal"></b></span><input type="range" min="1" max="100" data-bind="led.speed"></label>
+          <label class="field" id="ledWField"><span>White channel <b id="ledWVal"></b></span><input type="range" min="0" max="255" data-bind="led.white"></label>
+        </div>
+        <h4>Quick colors</h4>
+        <div class="swatches" id="swatches"></div>
+        <p class="small muted" style="margin-top:10px">Status effect: amber pulse = waiting for a connection · primary color = connected · green = moving · red = E-stop.</p>
+        <div class="row end" style="margin-top:8px"><button class="btn sm primary" id="ledApply">Send to Pico</button></div>
+      </div>
+    </div>
+
+    <!-- ================= SETTINGS ================= -->
+    <div class="panel" id="tab-settings">
+      <div class="card">
+        <div class="head"><h3>Appearance</h3></div>
+        <div class="seg" id="themeSeg">
+          <button data-theme="light">☀ Light</button><button data-theme="dark">☾ Dark</button><button data-theme="auto">◐ Both (follow system)</button>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <label class="chk"><input type="checkbox" data-bind="view.grid"> Floor grid</label>
+          <label class="chk"><input type="checkbox" data-bind="view.envelope"> Reach envelope</label>
+          <label class="chk"><input type="checkbox" data-bind="view.axes"> Axes</label>
+          <label class="chk"><input type="checkbox" data-bind="view.shadows"> Shadows</label>
+          <label class="chk"><input type="checkbox" data-bind="view.ikMarker"> IK target marker</label>
+        </div>
+      </div>
+      <div class="card">
+        <div class="head"><h3>Connection</h3></div>
+        <div class="grid3">
+          <label class="field"><span>Transport</span><select data-bind="conn.transport"><option value="ws">Wi-Fi (WebSocket)</option><option value="serial">USB (Web Serial)</option></select></label>
+          <label class="field"><span>Pico IP / hostname</span><input type="text" data-bind="conn.host" placeholder="192.168.4.1"></label>
+          <label class="field"><span>Port</span><input type="number" min="1" max="65535" data-bind="conn.port"></label>
+          <label class="field"><span>WebSocket path</span><input type="text" data-bind="conn.path"></label>
+          <label class="field"><span>Serial baud</span><input type="number" data-bind="conn.baud"></label>
+          <label class="field"><span>Update rate (Hz)</span><input type="number" min="5" max="60" data-bind="conn.rate"></label>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <label class="chk"><input type="checkbox" data-bind="conn.autoReconnect"> Auto-reconnect</label>
+          <label class="chk"><input type="checkbox" data-bind="safety.floor"> IK keeps the arm above the table</label>
+        </div>
+        <p class="small muted" id="connHint"></p>
+      </div>
+      <div class="card">
+        <div class="head"><h3>Pico W firmware (MicroPython)</h3></div>
+        <p class="small muted">Generates a <code>main.py</code> that speaks this page's protocol, using your current pins and LED settings. Copy it and this <code>index.html</code> onto the Pico W (e.g. with Thonny); the Pico will then serve this page at <code>http://&lt;pico-ip&gt;/</code>.</p>
+        <div class="grid2">
+          <label class="field"><span>Wi-Fi name (SSID)</span><input type="text" id="fwSsid" autocomplete="off"></label>
+          <label class="field"><span>Wi-Fi password</span><input type="password" id="fwPass" autocomplete="new-password"></label>
+          <label class="field"><span>Access-point name (fallback)</span><input type="text" id="fwApSsid" value="ArmCtl-Pico"></label>
+          <label class="field"><span>Access-point password (≥ 8 chars)</span><input type="text" id="fwApPass" value="robotarm"></label>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <label class="chk small"><input type="checkbox" id="fwAp"> Always start as access point (no home Wi-Fi)</label>
+          <span class="grow"></span>
+          <button class="btn sm primary" id="fwDownload">Download main.py</button>
+        </div>
+        <p class="small muted">Wi-Fi credentials are only written into the downloaded file; they are not stored by this page. In access-point mode the Pico is at <code>192.168.4.1</code>. The 3D view loads three.js from the internet; without internet the page falls back to a 2D schematic view.</p>
+      </div>
+      <div class="card">
+        <div class="head"><h3>Configuration</h3></div>
+        <div class="row">
+          <button class="btn sm" id="cfgExport">Export settings</button>
+          <button class="btn sm" id="cfgImport">Import settings</button>
+          <input type="file" id="cfgFile" accept="application/json,.json" hidden>
+          <span class="grow"></span>
+          <button class="btn sm ghost" id="cfgReset">Reset everything</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="head"><h3>Console</h3>
+          <label class="chk small"><input type="checkbox" id="logVerbose"> Show position packets</label>
+          <button class="btn sm ghost" id="logClear">Clear</button>
+        </div>
+        <div class="console" id="console"></div>
+        <div class="row" style="margin-top:8px">
+          <input type="text" id="rawCmd" class="grow mono" placeholder='{"t":"ping"}'>
+          <button class="btn sm" id="rawSend">Send</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+<div class="toast" id="toast"></div>
+
+<!-- MicroPython firmware template (filled in by "Download main.py") -->
+<script type="text/plain" id="fwTemplate">
+# ArmCtl firmware for Raspberry Pi Pico W (MicroPython 1.20 or newer)
+# Generated by ArmCtl index.html. Copy this file as main.py and index.html to the Pico W.
+# Browse to http://<pico-ip>/  — or connect over USB with Web Serial.
+import network, time, json, sys, os, math, struct, hashlib, binascii, machine, neopixel, select
+try:
+    import asyncio
+except ImportError:
+    import uasyncio as asyncio
+
+WIFI_SSID = {{SSID}}
+WIFI_PASS = {{PASS}}
+AP_MODE = {{AP}}            # True: always create our own Wi-Fi network
+AP_SSID = {{AP_SSID}}
+AP_PASS = {{AP_PASS}}
+HOSTNAME = "armctl"
+
+FW = "armctl-1.0"
+CFG_FILE = "arm_cfg.json"
+WS_GUID = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+
+# Pins & LED setup from the web page. A config saved from the page (arm_cfg.json) overrides it.
+cfg = json.loads('''{{CFG}}''')
+try:
+    with open(CFG_FILE) as f:
+        cfg = json.load(f)
+except Exception:
+    pass
+
+st = {"estop": False, "moved": 0, "seen": 0, "clients": 0}
+led = {"mode": "status", "c1": [0, 120, 255, 0], "c2": [255, 0, 120, 0], "bri": 80, "speed": 50}
+led.update(cfg.get("fx", {}))
+pwms = []
+pins_used = []
+last_us = []
+np = None
+
+
+def save_cfg():
+    try:
+        with open(CFG_FILE, "w") as f:
+            json.dump(cfg, f)
+        return True
+    except Exception as e:
+        print("save failed", e)
+        return False
+
+
+# ---------------- servos ----------------
+def setup_servos():
+    global pwms, pins_used
+    for p in pwms:
+        try:
+            p.deinit()
+        except Exception:
+            pass
+    for n in pins_used:
+        machine.Pin(n, machine.Pin.IN)
+    pwms = []
+    pins_used = []
+    for s in cfg["servos"]:
+        p = machine.PWM(machine.Pin(s["pin"]))
+        p.freq(s.get("freq", 50))
+        p.duty_u16(0)          # no pulses until the page sends a position
+        pwms.append(p)
+        pins_used.append(s["pin"])
+    if last_us and not st["estop"]:
+        set_us(last_us)
+
+
+def set_us(us):
+    global last_us
+    last_us = list(us)
+    for i in range(min(len(us), len(pwms))):
+        v = us[i]
+        if v and 400 <= v <= 2700:
+            pwms[i].duty_ns(int(v * 1000))
+        else:
+            pwms[i].duty_u16(0)
+
+
+def release():
+    for p in pwms:
+        p.duty_u16(0)
+
+
+# ---------------- NeoPixels ----------------
+def setup_led():
+    global np
+    if np:
+        try:
+            np.fill((0,) * np.bpp)
+            np.write()
+        except Exception:
+            pass
+    np = None
+    L = cfg.get("led")
+    if not L or L.get("count", 0) <= 0:
+        return
+    bpp = L.get("bpp", 3)
+    np = neopixel.NeoPixel(machine.Pin(L["pin"]), L["count"], bpp=bpp, timing=L.get("timing", 1))
+    order = L.get("order", "GRBW"[:bpp])
+    np.ORDER = tuple(order.index(c) for c in "RGBW"[:bpp])
+
+
+def wheel(p):
+    p = int(p) % 256
+    if p < 85:
+        return [255 - p * 3, p * 3, 0, 0]
+    if p < 170:
+        p -= 85
+        return [0, 255 - p * 3, p * 3, 0]
+    p -= 170
+    return [p * 3, 0, 255 - p * 3, 0]
+
+
+def render_led(t):
+    n = np.n
+    bpp = np.bpp
+    b = led["bri"] / 255
+    sp = max(1, led["speed"]) / 50
+    m = led["mode"]
+    c1 = (list(led["c1"]) + [0, 0, 0, 0])[:4]
+    c2 = (list(led["c2"]) + [0, 0, 0, 0])[:4]
+
+    def put(i, c, k=1.0):
+        np[i] = tuple(max(0, min(255, int(c[j] * b * k))) for j in range(bpp))
+
+    if m == "status":
+        now = time.ticks_ms()
+        if st["estop"]:
+            c, k = [255, 0, 0, 0], 1.0
+        elif time.ticks_diff(now, st["moved"]) < 600:
+            c, k = [0, 255, 60, 0], 1.0
+        elif st["seen"] and time.ticks_diff(now, st["seen"]) < 4000:
+            c, k = c1, 0.45 + 0.55 * (math.sin(t * 0.05) + 1) / 2
+        else:
+            c, k = [255, 140, 0, 0], 0.1 + 0.9 * (math.sin(t * 0.12) + 1) / 2
+        for i in range(n):
+            put(i, c, k)
+    elif m == "solid":
+        for i in range(n):
+            put(i, c1)
+    elif m == "breathe":
+        k = 0.05 + 0.95 * (math.sin(t * 0.06 * sp) + 1) / 2
+        for i in range(n):
+            put(i, c1, k)
+    elif m == "rainbow":
+        for i in range(n):
+            put(i, wheel(i * 256 / n + t * 2 * sp))
+    elif m == "chase":
+        tail = max(1, n / 3)
+        head = int(t * 0.25 * sp) % n
+        for i in range(n):
+            d = (head - i) % n
+            if d < tail:
+                put(i, c1, 1 - d / tail)
+            else:
+                put(i, c2, 0.15)
+    elif m == "gradient":
+        for i in range(n):
+            k = (i / n + t * 0.004 * sp) % 1
+            k = 1 - abs(2 * k - 1)
+            put(i, [c1[j] + (c2[j] - c1[j]) * k for j in range(4)])
+    else:
+        np.fill((0,) * bpp)
+    np.write()
+
+
+async def led_task():
+    t = 0
+    while True:
+        if np:
+            try:
+                render_led(t)
+            except Exception as e:
+                print("led error", e)
+        t += 1
+        await asyncio.sleep_ms(33)
+
+
+# ---------------- protocol ----------------
+def handle(line):
+    try:
+        m = json.loads(line)
+    except Exception:
+        return None
+    st["seen"] = time.ticks_ms()
+    t = m.get("t")
+    if t == "pos":
+        st["estop"] = False
+        set_us(m.get("us", []))
+        st["moved"] = st["seen"]
+    elif t == "off":
+        release()
+        st["estop"] = bool(m.get("estop", True))
+    elif t == "cfg":
+        if "servos" in m:
+            cfg["servos"] = m["servos"]
+        if "led" in m:
+            cfg["led"] = m["led"]
+        setup_servos()
+        setup_led()
+        saved = save_cfg() if m.get("save") else False
+        return {"t": "ack", "what": "cfg", "saved": saved}
+    elif t == "led":
+        led.update(m.get("fx", {}))
+        if m.get("save"):
+            cfg["fx"] = dict(led)
+            save_cfg()
+    elif t == "ping":
+        return {"t": "pong", "id": m.get("id")}
+    elif t == "hello":
+        return {"t": "hello", "fw": FW, "servos": len(pwms), "led": cfg.get("led")}
+    return None
+
+
+async def serial_task():
+    p = select.poll()
+    p.register(sys.stdin, select.POLLIN)
+    buf = []
+    while True:
+        while p.poll(0):
+            c = sys.stdin.read(1)
+            if c == "\n":
+                r = handle("".join(buf))
+                buf = []
+                if r:
+                    print(json.dumps(r))
+            elif c != "\r":
+                buf.append(c)
+                if len(buf) > 4096:
+                    buf = []
+        await asyncio.sleep_ms(4)
+
+
+# ---------------- HTTP + WebSocket server ----------------
+async def ws_send(w, obj):
+    data = json.dumps(obj).encode()
+    n = len(data)
+    hdr = bytes((0x81, n)) if n < 126 else bytes((0x81, 126)) + struct.pack(">H", n)
+    w.write(hdr + data)
+    await w.drain()
+
+
+async def ws_loop(r, w):
+    st["clients"] += 1
+    try:
+        while True:
+            h = await r.readexactly(2)
+            op = h[0] & 0x0F
+            n = h[1] & 0x7F
+            if n == 126:
+                n = struct.unpack(">H", await r.readexactly(2))[0]
+            elif n == 127:
+                n = struct.unpack(">Q", await r.readexactly(8))[0]
+            mask = await r.readexactly(4) if h[1] & 0x80 else b"\x00\x00\x00\x00"
+            data = bytearray(await r.readexactly(n)) if n else bytearray()
+            for i in range(n):
+                data[i] ^= mask[i & 3]
+            if op == 8:
+                w.write(b"\x88\x00")
+                await w.drain()
+                break
+            if op == 9 and n < 126:
+                w.write(bytes((0x8A, n)) + data)
+                await w.drain()
+            elif op == 1:
+                resp = handle(data.decode())
+                if resp:
+                    await ws_send(w, resp)
+    except Exception:
+        pass
+    finally:
+        st["clients"] -= 1
+
+
+async def send_file(w, path):
+    if path not in ("/", "/index.html"):
+        w.write(b"HTTP/1.1 404 Not Found\r\nContent-Length: 9\r\nConnection: close\r\n\r\nNot found")
+        await w.drain()
+        return
+    try:
+        size = os.stat("index.html")[6]
+    except OSError:
+        msg = b"index.html is missing - copy it to the Pico W next to main.py"
+        w.write(("HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: %d\r\nConnection: close\r\n\r\n" % len(msg)).encode() + msg)
+        await w.drain()
+        return
+    w.write(("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: %d\r\nCache-Control: no-cache\r\nConnection: close\r\n\r\n" % size).encode())
+    await w.drain()
+    buf = bytearray(1024)
+    with open("index.html", "rb") as f:
+        while True:
+            n = f.readinto(buf)
+            if not n:
+                break
+            w.write(bytes(buf[:n]))
+            await w.drain()
+
+
+async def client(r, w):
+    try:
+        line = await r.readline()
+        if not line:
+            return
+        parts = line.decode().split(" ")
+        path = parts[1] if len(parts) > 1 else "/"
+        hdr = {}
+        while True:
+            l = await r.readline()
+            if not l or l == b"\r\n":
+                break
+            k, _, v = l.decode().partition(":")
+            hdr[k.strip().lower()] = v.strip()
+        if hdr.get("upgrade", "").lower() == "websocket":
+            key = hdr.get("sec-websocket-key", "")
+            acc = binascii.b2a_base64(hashlib.sha1(key.encode() + WS_GUID).digest()).strip()
+            w.write(b"HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: " + acc + b"\r\n\r\n")
+            await w.drain()
+            await ws_loop(r, w)
+        else:
+            await send_file(w, path.split("?")[0])
+    except Exception as e:
+        print("http error", e)
+    finally:
+        try:
+            w.close()
+            await w.wait_closed()
+        except Exception:
+            pass
+
+
+def wifi_up():
+    if not AP_MODE and WIFI_SSID:
+        try:
+            network.hostname(HOSTNAME)
+        except Exception:
+            pass
+        w = network.WLAN(network.STA_IF)
+        w.active(True)
+        try:
+            w.config(pm=0xa11140)   # disable power saving -> lower latency
+        except Exception:
+            pass
+        w.connect(WIFI_SSID, WIFI_PASS)
+        for _ in range(40):
+            if w.isconnected():
+                break
+            time.sleep_ms(500)
+        if w.isconnected():
+            return w.ifconfig()[0]
+        print("Wi-Fi connection failed - starting access point")
+        w.active(False)
+    ap = network.WLAN(network.AP_IF)
+    ap.config(essid=AP_SSID, password=AP_PASS)
+    ap.active(True)
+    return ap.ifconfig()[0]
+
+
+async def main():
+    setup_servos()
+    setup_led()
+    asyncio.create_task(led_task())
+    ip = wifi_up()
+    print(json.dumps({"t": "log", "msg": "ArmCtl ready at http://%s/" % ip}))
+    await asyncio.start_server(client, "0.0.0.0", 80)
+    asyncio.create_task(serial_task())
+    while True:
+        await asyncio.sleep(1)
+
+
+asyncio.run(main())
+</script>
+
+<script type="module">
+/* =====================================================================
+   ArmCtl — control page for a 6-axis robotic arm on a Raspberry Pi Pico W
+   ===================================================================== */
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const D2R = Math.PI / 180;
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const round = (v, d = 0) => { const k = 10 ** d; return Math.round(v * k) / k; };
+
+/* ---------------- hardware model ---------------- */
+const JOINTS = [
+  { id: 'base',     name: 'Base',       keys: ['q', 'a'], unit: '°', servo: 'MG996R' },
+  { id: 'shoulder', name: 'Shoulder',   keys: ['w', 's'], unit: '°', servo: '2× MG996R' },
+  { id: 'elbow',    name: 'Elbow',      keys: ['e', 'd'], unit: '°', servo: 'MG996R' },
+  { id: 'wrist',    name: 'Wrist yaw',  keys: ['r', 'f'], unit: '°', servo: 'MG90S' },
+  { id: 'roll',     name: 'Wrist roll', keys: ['t', 'g'], unit: '°', servo: 'MG90S' },
+  { id: 'gripper',  name: 'Gripper',    keys: ['y', 'h'], unit: '%', servo: 'MG90S' },
+];
+// Order here = order of pulse widths in the "pos" packet sent to the Pico
+const SERVOS = [
+  { id: 'base',      name: 'Base',        joint: 'base',     type: 'MG996R' },
+  { id: 'shoulderA', name: 'Shoulder A',  joint: 'shoulder', type: 'MG996R' },
+  { id: 'shoulderB', name: 'Shoulder B',  joint: 'shoulder', type: 'MG996R' },
+  { id: 'elbow',     name: 'Elbow',       joint: 'elbow',    type: 'MG996R' },
+  { id: 'wrist',     name: 'Wrist yaw',   joint: 'wrist',    type: 'MG90S' },
+  { id: 'roll',      name: 'Wrist roll',  joint: 'roll',     type: 'MG90S' },
+  { id: 'gripper',   name: 'Gripper',     joint: 'gripper',  type: 'MG90S' },
+];
+const PICO_PINS = [...Array(23).keys(), 26, 27, 28];
+const LED_TYPES = {
+  'WS2812B':     { order: 'GRB',  bpp: 3, khz: 800, info: '5 V, the most common NeoPixel.' },
+  'WS2812':      { order: 'GRB',  bpp: 3, khz: 800, info: '5 V, older 6-pin version of the WS2812B.' },
+  'WS2813':      { order: 'GRB',  bpp: 3, khz: 800, info: '5 V, with backup data line.' },
+  'WS2815':      { order: 'GRB',  bpp: 3, khz: 800, info: '12 V strip — needs a separate 12 V supply and a level shifter is recommended.' },
+  'WS2811':      { order: 'RGB',  bpp: 3, khz: 800, info: '12 V pixel driver IC; some older strips need 400 kHz.' },
+  'SK6812':      { order: 'GRB',  bpp: 3, khz: 800, info: '5 V, WS2812B-compatible.' },
+  'SK6812 RGBW': { order: 'GRBW', bpp: 4, khz: 800, info: '5 V, with an extra white LED (4 channels).' },
+  'APA106':      { order: 'RGB',  bpp: 3, khz: 800, info: 'Through-hole 5 mm / 8 mm addressable LED.' },
+  'PL9823':      { order: 'RGB',  bpp: 3, khz: 800, info: 'Through-hole addressable LED (APA106 clone).' },
+  'Custom':      { order: null,   bpp: null, khz: null, info: 'Set the color order, channels and data rate manually.' },
+};
+
+const servoDefaults = (pin, type, extra = {}) => ({ pin, type, center: 90, invert: false, minAngle: 0, maxAngle: 180, minUs: 500, maxUs: 2500, range: 180, ...extra });
+const DEFAULT_CFG = {
+  version: 1,
+  theme: 'auto',
+  mode: 'sim',
+  speed: 50,
+  geometry: { H: 95, L1: 105, L2: 100, Lw: 45, Lg: 85 },
+  wristMode: 'yaw',
+  joints: {
+    base:     { min: -90, max: 90, home: 0 },
+    shoulder: { min: -80, max: 80, home: 0 },
+    elbow:    { min: -90, max: 90, home: 0 },
+    wrist:    { min: -90, max: 90, home: 0 },
+    roll:     { min: -90, max: 90, home: 0 },
+    gripper:  { min: 0,   max: 100, home: 50 },
+  },
+  servos: {
+    base:      servoDefaults(0, 'MG996R'),
+    shoulderA: servoDefaults(1, 'MG996R'),
+    shoulderB: servoDefaults(2, 'MG996R', { invert: true }),
+    elbow:     servoDefaults(3, 'MG996R'),
+    wrist:     servoDefaults(4, 'MG90S'),
+    roll:      servoDefaults(5, 'MG90S'),
+    gripper:   servoDefaults(6, 'MG90S', { closedAngle: 40, openAngle: 130 }),
+  },
+  typeSpeed: { MG996R: 300, MG90S: 450 },
+  led: { enabled: true, type: 'WS2812B', pin: 16, count: 8, order: 'GRB', bpp: 3, khz: 800,
+         mode: 'status', color1: '#0078ff', color2: '#ff0078', white: 0, brightness: 80, speed: 50 },
+  conn: { transport: 'ws', host: '', port: 80, path: '/ws', baud: 115200, rate: 25, autoReconnect: true },
+  view: { grid: true, envelope: true, axes: false, shadows: true, ikMarker: true, trail: false },
+  sim: { realistic: true, ghost: false, tolerance: 15, poseTol: 8 },
+  safety: { floor: true },
+  practice: { best: {} },
+  poses: [
+    { name: 'Home',          q: { base: 0, shoulder: 0, elbow: 0, wrist: 0, roll: 0, gripper: 50 } },
+    { name: 'Reach forward', q: { base: 0, shoulder: 40, elbow: 20, wrist: 0, roll: 0, gripper: 100 } },
+    { name: 'Look left',     q: { base: 60, shoulder: 10, elbow: 10, wrist: 0, roll: 0, gripper: 50 } },
+    { name: 'Stand tall',    q: { base: 0, shoulder: 0, elbow: 85, wrist: 0, roll: 90, gripper: 0 } },
+  ],
+  sequence: [],
+  seqLoop: false,
+  seqDwell: 400,
+};
+
+/* ---------------- config persistence ---------------- */
+const CFG_KEY = 'armctl.cfg';
+function merge(base, over) {
+  if (over === undefined) return structuredClone(base);
+  if (Array.isArray(base) || base === null || typeof base !== 'object') return over;
+  if (over === null || typeof over !== 'object' || Array.isArray(over)) return structuredClone(base);
+  const out = {};
+  for (const k of new Set([...Object.keys(base), ...Object.keys(over)])) out[k] = k in base ? merge(base[k], over[k]) : over[k];
+  return out;
+}
+let cfg;
+try { cfg = merge(DEFAULT_CFG, JSON.parse(localStorage.getItem(CFG_KEY) || '{}')); } catch (e) { cfg = structuredClone(DEFAULT_CFG); }
+let saveTimer = 0;
+function saveCfg() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => { try { localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); } catch (e) {} }, 250);
+}
+const getPath = p => p.split('.').reduce((o, k) => (o == null ? undefined : o[k]), cfg);
+function setPath(p, v) { const ks = p.split('.'); let o = cfg; for (let i = 0; i < ks.length - 1; i++) o = o[ks[i]]; o[ks[ks.length - 1]] = v; }
+
+/* ---------------- runtime state ---------------- */
+const homePose = () => Object.fromEntries(JOINTS.map(j => [j.id, cfg.joints[j.id].home]));
+const state = {
+  target: homePose(),
+  current: homePose(),
+  estop: false,
+  overrides: {},          // calibration direct drive: servoId -> servo angle
+  keys: new Set(),
+  ik: { x: 0, y: 0, z: 0, pitch: 0 },
+  seq: { playing: false, idx: 0, reachedAt: 0 },
+};
+
+/* ---------------- small UI helpers ---------------- */
+let toastTimer = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2200); }
+function log(msg, cls = '') {
+  const c = $('#console'); const line = document.createElement('div');
+  line.className = cls; line.textContent = `${new Date().toLocaleTimeString()}  ${msg}`;
+  c.appendChild(line); while (c.childElementCount > 300) c.firstChild.remove();
+  c.scrollTop = c.scrollHeight;
+}
+
+/* =====================================================================
+   Kinematics
+   Robot frame: X forward, Y left, Z up (mm). Origin = base centre on the table.
+   ===================================================================== */
+function m4(a, b) {
+  const r = new Array(16);
+  for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++)
+    r[i * 4 + j] = a[i * 4] * b[j] + a[i * 4 + 1] * b[4 + j] + a[i * 4 + 2] * b[8 + j] + a[i * 4 + 3] * b[12 + j];
+  return r;
+}
+const rz = a => { const c = Math.cos(a), s = Math.sin(a); return [c, -s, 0, 0, s, c, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]; };
+const ry = a => { const c = Math.cos(a), s = Math.sin(a); return [c, 0, s, 0, 0, 1, 0, 0, -s, 0, c, 0, 0, 0, 0, 1]; };
+const rx = a => { const c = Math.cos(a), s = Math.sin(a); return [1, 0, 0, 0, 0, c, -s, 0, 0, s, c, 0, 0, 0, 0, 1]; };
+const tz = d => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, d, 0, 0, 0, 1];
+const pos = T => ({ x: T[3], y: T[7], z: T[11] });
+
+// Must mirror the hierarchy in buildArm()
+function fk(q) {
+  const g = cfg.geometry, pts = [{ x: 0, y: 0, z: 0 }];
+  let T = m4(rz(q.base * D2R), tz(g.H)); pts.push(pos(T));
+  T = m4(m4(T, ry(q.shoulder * D2R)), tz(g.L1)); pts.push(pos(T));
+  T = m4(m4(T, ry((90 - q.elbow) * D2R)), tz(g.L2)); pts.push(pos(T));
+  T = m4(m4(T, cfg.wristMode === 'pitch' ? ry(-q.wrist * D2R) : rx(q.wrist * D2R)), tz(g.Lw)); pts.push(pos(T));
+  T = m4(m4(T, rz(q.roll * D2R)), tz(g.Lg)); pts.push(pos(T));
+  const dir = { x: T[2], y: T[6], z: T[10] };
+  return { pts, tip: pts[5], dir, pitch: Math.asin(clamp(dir.z, -1, 1)) / D2R };
+}
+const reach = () => { const g = cfg.geometry; return g.L1 + g.L2 + g.Lw + g.Lg; };
+const belowFloor = f => f.pts.slice(2).some(p => p.z < -0.5);
+
+function solveLinear(A, b) {           // tiny Gaussian elimination, n <= 4
+  const n = b.length, M = A.map((r, i) => [...r, b[i]]);
+  for (let c = 0; c < n; c++) {
+    let p = c; for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
+    [M[c], M[p]] = [M[p], M[c]];
+    const d = M[c][c] || 1e-9;
+    for (let r = 0; r < n; r++) if (r !== c) { const f = M[r][c] / d; for (let k = c; k <= n; k++) M[r][k] -= f * M[c][k]; }
+  }
+  return M.map((r, i) => r[n] / (r[i] || 1e-9));
+}
+
+// Damped-least-squares IK for base/shoulder/elbow/wrist. Works for both wrist-axis modes and respects joint limits.
+const IK_J = ['base', 'shoulder', 'elbow', 'wrist'];
+function solveIK(tgt, pitch, start, quick = false) {
+  const W = 3;                                                 // mm of error per degree of pitch error
+  const lim = k => cfg.joints[k];
+  const err = q => { const f = fk(q); const e = [tgt.x - f.tip.x, tgt.y - f.tip.y, tgt.z - f.tip.z]; if (pitch != null) e.push(W * (pitch - f.pitch)); return { e, f }; };
+  const yaw = clamp(Math.atan2(tgt.y, tgt.x) / D2R, lim('base').min, lim('base').max);
+  const seeds = [{ ...start }];
+  for (const [s, e, w] of [[0, 0, 0], [35, 10, 0], [-20, 40, 0], [50, 30, -40], [15, -50, 30], [60, -20, 20]])
+    seeds.push({ ...start, base: yaw, shoulder: s, elbow: e, wrist: w });
+  let best = null;
+  for (let si = 0; si < seeds.length; si++) {
+    const q = { ...seeds[si] };
+    for (const k of IK_J) q[k] = clamp(q[k], lim(k).min, lim(k).max);
+    let r = err(q);
+    for (let it = 0; it < (quick ? 60 : 160); it++) {
+      const pe = Math.hypot(r.e[0], r.e[1], r.e[2]), ae = pitch == null ? 0 : Math.abs(r.e[3] / W);
+      if (pe < 0.2 && ae < 0.2) break;
+      const m = r.e.length, J = [...Array(m)].map(() => [0, 0, 0, 0]);
+      for (let j = 0; j < 4; j++) {
+        const k = IK_J[j], h = 0.25, r2 = err({ ...q, [k]: q[k] + h });
+        for (let i = 0; i < m; i++) J[i][j] = (r.e[i] - r2.e[i]) / h;
+      }
+      const lam2 = 2.5;
+      const A = [...Array(m)].map((_, i) => [...Array(m)].map((_, k) => J[i].reduce((s, v, j) => s + v * J[k][j], 0) + (i === k ? lam2 : 0)));
+      const y = solveLinear(A, r.e);
+      let dq = [0, 1, 2, 3].map(j => J.reduce((s, row, i) => s + row[j] * y[i], 0));
+      const mx = Math.max(...dq.map(Math.abs)); if (mx > 8) dq = dq.map(v => v * 8 / mx);
+      for (let j = 0; j < 4; j++) { const k = IK_J[j]; q[k] = clamp(q[k] + dq[j], lim(k).min, lim(k).max); }
+      r = err(q);
+    }
+    const pe = Math.hypot(r.e[0], r.e[1], r.e[2]), ae = pitch == null ? 0 : Math.abs(r.e[3] / W);
+    const floor = cfg.safety.floor && belowFloor(r.f);
+    const ok = pe < 1.5 && ae < 1.5 && !floor;
+    const move = IK_J.reduce((s, k) => s + Math.abs(q[k] - start[k]), 0);
+    const cost = pe + ae * W + (floor ? 1000 : 0) + move * 0.02;
+    if (!best || (ok && !best.ok) || (ok === best.ok && cost < best.cost)) best = { q, pe, ae, ok, floor, cost };
+    if (si === 0 && ok) break;                                  // the current pose converged: smoothest result
+  }
+  return best;
+}
+
+/* =====================================================================
+   Servo mapping
+   ===================================================================== */
+function servoAngle(sid, jointValue) {
+  const s = cfg.servos[sid];
+  const a = sid === 'gripper'
+    ? s.closedAngle + (s.openAngle - s.closedAngle) * jointValue / 100
+    : s.center + (s.invert ? -1 : 1) * jointValue;
+  return clamp(a, s.minAngle, s.maxAngle);
+}
+const angleToUs = (sid, a) => { const s = cfg.servos[sid]; return Math.round(s.minUs + (a / s.range) * (s.maxUs - s.minUs)); };
+function pulses() {
+  return SERVOS.map(sv => angleToUs(sv.id, sv.id in state.overrides ? state.overrides[sv.id] : servoAngle(sv.id, state.current[sv.joint])));
+}
+
+/* =====================================================================
+   Connection (WebSocket over Wi-Fi, or Web Serial over USB)
+   ===================================================================== */
+const link = {
+  kind: null, ws: null, port: null, reader: null, writer: null, connected: false, connecting: false,
+  wantOpen: false, retry: 0, lastPong: 0, rtt: null, lastSent: '', lastSendT: 0, pingT: 0, fw: '',
+
+  wsUrl() {
+    const c = cfg.conn; const host = c.host || location.hostname || '192.168.4.1';
+    const path = c.path.startsWith('/') ? c.path : '/' + c.path;
+    return `ws://${host}${+c.port === 80 ? '' : ':' + c.port}${path}`;
+  },
+  async open() {
+    if (this.connected || this.connecting) return;
+    this.wantOpen = true; this.connecting = true; updateConn();
+    try {
+      if (cfg.conn.transport === 'serial') await this.openSerial(); else await this.openWs();
+    } catch (e) {
+      this.connecting = false; log('Connect failed: ' + (e.message || e), 'er'); updateConn();
+      if (cfg.conn.transport === 'ws') this.scheduleRetry(); else this.wantOpen = false;
+    }
+  },
+  openWs() {
+    return new Promise((resolve, reject) => {
+      if (location.protocol === 'https:') log('Note: browsers block ws:// from https pages. Open this page from the Pico (http) or use USB.', 'er');
+      const url = this.wsUrl(); log('Connecting to ' + url);
+      let ws; try { ws = new WebSocket(url); } catch (e) { reject(e); return; }
+      this.ws = ws; this.kind = 'ws';
+      const to = setTimeout(() => { ws.close(); reject(new Error('timeout')); }, 5000);
+      ws.onopen = () => { clearTimeout(to); this.onOpen(); resolve(); };
+      ws.onmessage = ev => this.onLine(String(ev.data));
+      ws.onerror = () => {};
+      ws.onclose = () => {
+        clearTimeout(to);
+        const wasConnected = this.connected;
+        if (this.ws === ws) this.onClose();
+        if (wasConnected) { log('Connection closed', 'er'); this.scheduleRetry(); }
+        else reject(new Error('could not reach ' + url));   // open() handles the retry
+      };
+    });
+  },
+  async openSerial() {
+    if (!('serial' in navigator)) throw new Error('Web Serial is not supported in this browser (use Chrome or Edge on desktop).');
+    const port = await navigator.serial.requestPort();
+    await port.open({ baudRate: +cfg.conn.baud || 115200 });
+    this.port = port; this.kind = 'serial';
+    this.writer = port.writable.getWriter();
+    this.onOpen();
+    this.readSerial();
+  },
+  async readSerial() {
+    const dec = new TextDecoder(); let buf = '';
+    try {
+      this.reader = this.port.readable.getReader();
+      while (true) {
+        const { value, done } = await this.reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let i; while ((i = buf.indexOf('\n')) >= 0) { const l = buf.slice(0, i).trim(); buf = buf.slice(i + 1); if (l) this.onLine(l); }
+      }
+    } catch (e) { if (this.connected) log('Serial error: ' + e.message, 'er'); }
+    finally { try { this.reader.releaseLock(); } catch (e) {} }
+    if (this.connected) this.close();
+  },
+  onOpen() {
+    this.connected = true; this.connecting = false; this.retry = 0; this.lastPong = performance.now(); this.lastSent = '';
+    log('Connected (' + (this.kind === 'ws' ? 'Wi-Fi' : 'USB') + ')', 'rx'); toast('Connected to Pico W');
+    if (this.kind === 'serial') this.raw('\r\n');
+    this.send({ t: 'hello' });
+    this.send(cfgPacket(false));
+    this.send(ledPacket(false));
+    updateConn();
+  },
+  onClose() {
+    this.connected = false; this.connecting = false; this.ws = null; this.rtt = null; updateConn();
+  },
+  scheduleRetry() {
+    if (!this.wantOpen || !cfg.conn.autoReconnect || this.kind === 'serial') return;
+    const d = Math.min(8000, 800 * 2 ** this.retry++);
+    setTimeout(() => { if (this.wantOpen && !this.connected) this.open(); }, d);
+  },
+  async close() {
+    this.wantOpen = false;
+    const was = this.connected;
+    if (this.ws) { try { this.ws.close(); } catch (e) {} }
+    if (this.port) {
+      const p = this.port; this.port = null; this.connected = false;
+      try { await this.reader?.cancel(); } catch (e) {}
+      try { this.writer?.releaseLock(); } catch (e) {}
+      try { await p.close(); } catch (e) {}
+    }
+    this.onClose(); if (was) log('Disconnected');
+  },
+  raw(text) {
+    if (this.kind === 'ws' && this.ws?.readyState === 1) this.ws.send(text);
+    else if (this.kind === 'serial' && this.writer) this.writer.write(new TextEncoder().encode(text)).catch(() => {});
+  },
+  send(obj) {
+    if (!this.connected) return false;
+    const text = JSON.stringify(obj);
+    this.raw(this.kind === 'serial' ? text + '\n' : text);
+    if (obj.t !== 'pos' && obj.t !== 'ping' || $('#logVerbose').checked) log('→ ' + text, 'tx');
+    return true;
+  },
+  onLine(line) {
+    let m; try { m = JSON.parse(line); } catch (e) { log('« ' + line); return; }
+    if (m.t === 'pong') { this.lastPong = performance.now(); this.rtt = Math.round(performance.now() - (m.id || 0)); updateConn(); return; }
+    if (m.t === 'hello') { this.fw = m.fw || ''; }
+    log('← ' + line, 'rx');
+  },
+};
+const live = () => cfg.mode === 'live';
+function cfgPacket(save) {
+  const L = cfg.led;
+  return {
+    t: 'cfg', save: !!save,
+    servos: SERVOS.map(s => ({ id: s.id, pin: +cfg.servos[s.id].pin, freq: 50 })),
+    led: { pin: +L.pin, count: L.enabled ? +L.count : 0, bpp: +L.bpp, timing: +L.khz === 800 ? 1 : 0, order: L.order, type: L.type },
+  };
+}
+const hexRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) || 0);
+function ledPacket(save) {
+  const L = cfg.led;
+  return { t: 'led', save: !!save, fx: { mode: L.enabled ? L.mode : 'off', c1: [...hexRgb(L.color1), +L.white], c2: [...hexRgb(L.color2), +L.white], bri: +L.brightness, speed: +L.speed } };
+}
+function updateConn() {
+  const dot = $('#connDot'), txt = $('#connText'), btn = $('#connBtn');
+  dot.className = 'dot' + (link.connected ? ' ok' : link.connecting ? ' warn' : '');
+  const via = cfg.conn.transport === 'serial' ? 'USB' : 'Wi-Fi';
+  txt.textContent = link.connected ? `${via} connected${link.rtt != null ? ' · ' + link.rtt + ' ms' : ''}` : link.connecting ? 'Connecting…' : 'Disconnected';
+  btn.textContent = link.connected || link.connecting ? 'Disconnect' : 'Connect';
+}
+// keep-alive + latency
+setInterval(() => {
+  if (!link.connected) return;
+  link.send({ t: 'ping', id: Math.round(performance.now()) });
+  if (link.kind === 'ws' && performance.now() - link.lastPong > 7000) { log('No reply from Pico — reconnecting', 'er'); try { link.ws.close(); } catch (e) {} }
+}, 2000);
+
+function sendPositions(now) {
+  if (!live() || !link.connected || state.estop) return;
+  if (now - link.lastSendT < 1000 / clamp(+cfg.conn.rate || 25, 5, 60)) return;
+  const us = pulses(); const key = us.join(',');
+  if (key === link.lastSent && now - link.lastSendT < 1000) return;   // resend once a second as a heartbeat
+  link.lastSent = key; link.lastSendT = now;
+  link.send({ t: 'pos', us });
+}
+
+/* =====================================================================
+   Motion
+   ===================================================================== */
+function setJoint(id, v, from = 'ui') {
+  const L = cfg.joints[id];
+  state.target[id] = clamp(Number(v) || 0, L.min, L.max);
+  if (from !== 'ik' && from !== 'seq') stopSeq();
+  onTargetChanged(from);
+}
+function setPose(q, from = 'ui') {
+  for (const j of JOINTS) if (q[j.id] != null) state.target[j.id] = clamp(q[j.id], cfg.joints[j.id].min, cfg.joints[j.id].max);
+  if (from !== 'seq') stopSeq();
+  onTargetChanged(from);
+}
+function onTargetChanged(from) {
+  refreshJointUI();
+  if (from !== 'ik') syncIkFromTarget();
+}
+function jointSpeed(id) {   // deg/s (or %/s for the gripper)
+  const type = id === 'gripper' || id === 'wrist' || id === 'roll' ? 'MG90S' : 'MG996R';
+  const base = id === 'gripper' ? cfg.typeSpeed.MG90S * 0.6 : cfg.typeSpeed[type];
+  return base * cfg.speed / 100;
+}
+
+/* =====================================================================
+   UI: joints
+   ===================================================================== */
+function buildJointRows() {
+  const wrap = $('#jointRows'); wrap.innerHTML = '';
+  for (const j of JOINTS) {
+    const L = cfg.joints[j.id];
+    const row = document.createElement('div'); row.className = 'jrow'; row.dataset.joint = j.id;
+    row.innerHTML = `
+      <div class="jhead"><span class="jname">${j.name}</span><span class="jtype">${j.servo}</span>
+        <span class="jnow" data-now></span><span class="jlim">${L.min}…${L.max}${j.unit}</span></div>
+      <div class="jctl">
+        <button class="btn icon" data-d="-1" title="−1 (Shift: −10)">−</button>
+        <input type="range" min="${L.min}" max="${L.max}" step="1" aria-label="${j.name}">
+        <button class="btn icon" data-d="1" title="+1 (Shift: +10)">+</button>
+        <input type="number" min="${L.min}" max="${L.max}" step="1" aria-label="${j.name} value">
+      </div>`;
+    const rng = $('input[type=range]', row), num = $('input[type=number]', row);
+    rng.addEventListener('input', () => setJoint(j.id, +rng.value));
+    num.addEventListener('change', () => setJoint(j.id, +num.value));
+    $$('button[data-d]', row).forEach(b => b.addEventListener('click', e => setJoint(j.id, state.target[j.id] + (+b.dataset.d) * (e.shiftKey ? 10 : 1))));
+    wrap.appendChild(row);
+  }
+  refreshJointUI();
+}
+function refreshJointUI() {
+  for (const row of $$('#jointRows .jrow')) {
+    const id = row.dataset.joint, v = round(state.target[id]);
+    const rng = $('input[type=range]', row), num = $('input[type=number]', row);
+    if (+rng.value !== v) rng.value = v;
+    if (document.activeElement !== num) num.value = v;
+  }
+}
+function refreshJointNow() {
+  for (const row of $$('#jointRows .jrow')) {
+    const id = row.dataset.joint, c = state.current[id], t = state.target[id];
+    $('[data-now]', row).textContent = Math.abs(c - t) > 0.5 ? `moving · ${round(c)}` : '';
+  }
+}
+
+/* =====================================================================
+   UI: IK
+   ===================================================================== */
+const IK_FIELDS = { x: 'ikX', y: 'ikY', z: 'ikZ', pitch: 'ikP' };
+function ikRanges() {
+  const R = Math.ceil(reach()), H = cfg.geometry.H;
+  const set = (id, a, b) => { for (const el of [$('#' + id), $('#' + id + 'r')]) { el.min = a; el.max = b; } };
+  set('ikX', -R, R); set('ikY', -R, R); set('ikZ', cfg.safety.floor ? 0 : -60, Math.ceil(H + R));
+}
+function writeIkFields() {
+  for (const [k, id] of Object.entries(IK_FIELDS)) {
+    const v = round(state.ik[k]);
+    if (document.activeElement !== $('#' + id)) $('#' + id).value = v;
+    $('#' + id + 'r').value = v;
+  }
+  updateIkMarker();
+}
+function syncIkFromTarget() {
+  const f = fk(state.target);
+  state.ik = { x: f.tip.x, y: f.tip.y, z: f.tip.z, pitch: f.pitch };
+  writeIkFields();
+  ikStatus('', '');
+}
+function ikStatus(msg, cls) {
+  const el = $('#ikStatus');
+  if (!msg) { const f = fk(state.target); msg = `Tool at X ${round(f.tip.x)}  Y ${round(f.tip.y)}  Z ${round(f.tip.z)} mm · pitch ${round(f.pitch)}°`; }
+  el.textContent = msg; el.className = 'status ' + (cls || '');
+}
+function ikGo(quick = false) {
+  const p = state.ik, lock = $('#ikLock').checked;
+  const r = solveIK(p, lock ? p.pitch : null, state.target, quick);
+  if (r.ok) {
+    stopSeq();
+    for (const k of IK_J) state.target[k] = r.q[k];
+    onTargetChanged('ik');
+    const f = fk(state.target);
+    if (!lock) { state.ik.pitch = f.pitch; writeIkFields(); }
+    ikStatus(`Reachable ✓  error ${r.pe.toFixed(1)} mm · pitch ${round(f.pitch)}°`, 'ok');
+    return true;
+  }
+  ikStatus(r.floor ? 'Not reachable without hitting the table.' : `Out of reach (closest ${r.pe.toFixed(0)} mm away${lock ? ', try releasing "Hold tool pitch"' : ''}).`, 'err');
+  updateIkMarker();
+  return false;
+}
+function ikJog(axis, delta, quick = false) {
+  const prev = state.ik[axis];
+  state.ik[axis] += delta; writeIkFields();
+  if (!ikGo(quick)) { state.ik[axis] = prev; writeIkFields(); }
+}
+function setupIk() {
+  ikRanges();
+  for (const [k, id] of Object.entries(IK_FIELDS)) {
+    const num = $('#' + id), rng = $('#' + id + 'r');
+    rng.addEventListener('input', () => { state.ik[k] = +rng.value; writeIkFields(); if ($('#ikLive').checked) ikGo(true); });
+    num.addEventListener('change', () => { state.ik[k] = +num.value; writeIkFields(); if ($('#ikLive').checked) ikGo(); });
+  }
+  $('#ikLock').addEventListener('change', () => { if ($('#ikLock').checked) syncIkFromTarget(); });
+  $('#ikGo').addEventListener('click', () => ikGo());
+  $('#ikSync').addEventListener('click', () => { syncIkFromTarget(); toast('IK target set to the current tool position'); });
+  $$('[data-jog]').forEach(b => b.addEventListener('click', () => { const [a, s] = b.dataset.jog.split(','); ikJog(a, +s * +$('#jogStep').value); }));
+}
+
+/* =====================================================================
+   UI: poses & sequences
+   ===================================================================== */
+const snap = q => Object.fromEntries(JOINTS.map(j => [j.id, round(q[j.id], 1)]));
+function renderPoses() {
+  const pl = $('#poseList');
+  pl.innerHTML = cfg.poses.length ? '' : '<div class="empty">No saved poses</div>';
+  cfg.poses.forEach((p, i) => {
+    const el = document.createElement('div'); el.className = 'item';
+    el.innerHTML = `<span class="name" title="${esc(JOINTS.map(j => `${j.name}: ${p.q[j.id]}`).join('\n'))}">${esc(p.name)}</span>
+      <button class="btn sm" data-a="go">Go</button><button class="btn sm" data-a="seq" title="Add to sequence">+ Seq</button>
+      <button class="btn sm ghost" data-a="del" title="Delete">✕</button>`;
+    el.addEventListener('click', e => {
+      const a = e.target.dataset.a; if (!a) return;
+      if (a === 'go') setPose(p.q);
+      if (a === 'seq') { cfg.sequence.push({ name: p.name, q: { ...p.q } }); saveCfg(); renderSeq(); }
+      if (a === 'del') { cfg.poses.splice(i, 1); saveCfg(); renderPoses(); }
+    });
+    pl.appendChild(el);
+  });
+}
+function renderSeq() {
+  const sl = $('#seqList');
+  sl.innerHTML = cfg.sequence.length ? '' : '<div class="empty">Add poses with “+ Seq” to build a sequence</div>';
+  cfg.sequence.forEach((s, i) => {
+    const el = document.createElement('div'); el.className = 'item' + (state.seq.playing && state.seq.idx === i ? ' playing' : '');
+    el.innerHTML = `<span class="mono small muted">${i + 1}</span><span class="name">${esc(s.name)}</span>
+      <button class="btn sm ghost" data-a="up" title="Move up">↑</button><button class="btn sm ghost" data-a="del" title="Remove">✕</button>`;
+    el.addEventListener('click', e => {
+      const a = e.target.dataset.a; if (!a) return;
+      if (a === 'up' && i > 0) [cfg.sequence[i - 1], cfg.sequence[i]] = [cfg.sequence[i], cfg.sequence[i - 1]];
+      if (a === 'del') cfg.sequence.splice(i, 1);
+      saveCfg(); renderSeq();
+    });
+    sl.appendChild(el);
+  });
+}
+function playSeq() {
+  if (!cfg.sequence.length) { toast('The sequence is empty'); return; }
+  if (state.estop) { toast('Release the E-stop first'); return; }
+  state.seq = { playing: true, idx: 0, reachedAt: 0 };
+  setPose(cfg.sequence[0].q, 'seq'); renderSeq();
+}
+function stopSeq() { if (state.seq.playing) { state.seq.playing = false; renderSeq(); } }
+function stepSeq(now) {
+  const s = state.seq; if (!s.playing) return;
+  const reached = JOINTS.every(j => Math.abs(state.current[j.id] - state.target[j.id]) < 0.6);
+  if (!reached) { s.reachedAt = 0; return; }
+  if (!s.reachedAt) s.reachedAt = now;
+  if (now - s.reachedAt < (+cfg.seqDwell || 0)) return;
+  s.idx++; s.reachedAt = 0;
+  if (s.idx >= cfg.sequence.length) { if (cfg.seqLoop) s.idx = 0; else { stopSeq(); toast('Sequence finished'); return; } }
+  setPose(cfg.sequence[s.idx].q, 'seq'); renderSeq();
+}
+
+/* =====================================================================
+   E-stop & mode
+   ===================================================================== */
+function setEstop(on) {
+  state.estop = on;
+  $('#estopBtn').classList.toggle('active', on);
+  $('#estopBtn').textContent = on ? 'RESET STOP' : 'E-STOP';
+  if (on) {
+    stopSeq(); prac.stop(false);
+    state.target = { ...state.current }; refreshJointUI(); syncIkFromTarget();
+    link.send({ t: 'off', estop: true });
+    toast('E-STOP — servos released');
+  } else {
+    state.target = { ...state.current }; link.lastSent = '';
+    toast('E-stop reset');
+  }
+  updateWarnings();
+}
+function setMode(m) {
+  if (m === cfg.mode) return;
+  if (m === 'live' && !confirm('Switch to LIVE mode? The real arm will move to the pose shown in the preview.')) { renderMode(); return; }
+  if (m === 'live' && prac.active) prac.stop(false);
+  cfg.mode = m; saveCfg(); link.lastSent = ''; state.overrides = {};
+  if (m === 'sim') link.send({ t: 'off', estop: false });
+  renderMode();
+  toast(m === 'live' ? 'LIVE mode — commands go to the arm' : 'Simulator mode — the arm is not driven');
+}
+function renderMode() {
+  $$('#modeSeg button').forEach(b => b.className = b.dataset.mode === cfg.mode ? 'on ' + cfg.mode : '');
+  const b = $('#modeBadge'); b.className = 'badge ' + cfg.mode; b.textContent = cfg.mode === 'live' ? 'LIVE' : 'SIMULATOR';
+  $('#simTag').textContent = cfg.mode === 'live' ? 'currently LIVE' : 'active'; $('#simTag').className = 'tag ' + (cfg.mode === 'live' ? 'err' : 'ok');
+  $('#simEnter').style.display = cfg.mode === 'live' ? '' : 'none';
+}
+
+/* =====================================================================
+   Simulator practice
+   ===================================================================== */
+const prac = {
+  active: false, kind: null, n: 10, hits: 0, start: 0, target: null, ghostQ: null, holdStart: 0,
+  begin(kind) {
+    if (state.estop) { toast('Release the E-stop first'); return; }
+    if (live()) setMode('sim');
+    if (live()) return;
+    stopSeq();
+    Object.assign(this, { active: true, kind, hits: 0, start: performance.now(), holdStart: 0, n: +$(kind === 'reach' ? '#pracReachN' : '#pracPoseN').value });
+    this.next(); renderPrac();
+  },
+  randomQ() {
+    for (let tries = 0; tries < 200; tries++) {
+      const q = {};
+      for (const j of JOINTS) { const L = cfg.joints[j.id]; const span = (L.max - L.min) * 0.8; q[j.id] = round(L.min + (L.max - L.min) * 0.1 + Math.random() * span); }
+      q.gripper = Math.random() < 0.5 ? 0 : 100;
+      const f = fk(q);
+      if (f.pts.slice(2).every(p => p.z > 15) && Math.hypot(f.tip.x, f.tip.y) > 70) return q;
+    }
+    return homePose();
+  },
+  next() {
+    const q = this.randomQ();
+    if (this.kind === 'reach') { this.target = fk(q).tip; this.ghostQ = null; }
+    else { this.ghostQ = q; this.target = null; }
+    this.holdStart = 0;
+  },
+  stop(finished) {
+    if (!this.active) return;
+    const t = (performance.now() - this.start) / 1000;
+    if (finished) {
+      const key = `${this.kind}-${this.n}`, best = cfg.practice.best[key];
+      const rec = !best || t < best; if (rec) { cfg.practice.best[key] = round(t, 1); saveCfg(); }
+      toast(`Done! ${this.n} in ${t.toFixed(1)} s${rec ? ' — new best!' : ''}`);
+    }
+    this.active = false; this.target = null; this.ghostQ = null; renderPrac();
+  },
+  tick(now) {
+    if (!this.active) return;
+    let inside = false;
+    if (this.kind === 'reach') { const tip = fk(state.current).tip; inside = Math.hypot(tip.x - this.target.x, tip.y - this.target.y, tip.z - this.target.z) <= +cfg.sim.tolerance; }
+    else inside = JOINTS.every(j => Math.abs(state.current[j.id] - this.ghostQ[j.id]) <= (j.id === 'gripper' ? 20 : +cfg.sim.poseTol));
+    if (inside) {
+      if (!this.holdStart) this.holdStart = now;
+      if (now - this.holdStart > 300) { this.hits++; if (this.hits >= this.n) this.stop(true); else this.next(); }
+    } else this.holdStart = 0;
+  },
+};
+function renderPrac() {
+  $('#pracReach').textContent = prac.active && prac.kind === 'reach' ? 'Stop' : 'Start';
+  $('#pracPose').textContent = prac.active && prac.kind === 'pose' ? 'Stop' : 'Start';
+  const b = cfg.practice.best, keys = Object.keys(b).sort();
+  $('#pracResults').innerHTML = keys.length
+    ? '<table><tr><th>Challenge</th><th>Best time</th></tr>' + keys.map(k => { const [kind, n] = k.split('-'); return `<tr><td>${kind === 'reach' ? 'Reach targets' : 'Match the pose'} × ${n}</td><td class="mono">${b[k]} s</td></tr>`; }).join('') + '</table>'
+    : '<span class="muted">No results yet — finish a practice run to record a best time.</span>';
+  if (!prac.active) $('#hud').style.display = 'none';
+}
+function updateHud(now) {
+  const h = $('#hud');
+  if (!prac.active) return;
+  h.style.display = 'block';
+  const t = ((now - prac.start) / 1000).toFixed(1);
+  h.innerHTML = `<big>${prac.hits} / ${prac.n}</big>${prac.kind === 'reach' ? 'Touch the glowing target' : 'Match the ghost arm'} · ${t} s`;
+}
+
+/* =====================================================================
+   Calibration UI
+   ===================================================================== */
+function buildCalibration() {
+  const wrap = $('#calServos'); wrap.innerHTML = '';
+  for (const sv of SERVOS) {
+    const g = sv.id === 'gripper';
+    const d = document.createElement('details'); d.className = 'servo'; d.dataset.servo = sv.id;
+    d.innerHTML = `
+      <summary>${sv.name} <span class="tag">${sv.type}</span><span class="tag" data-pin></span><span class="grow"></span><span class="tag" data-out></span></summary>
+      <div class="body">
+        <div class="grid3">
+          ${g ? `<label class="field"><span>Closed angle (°)</span><input type="number" min="0" max="270" data-bind="servos.${sv.id}.closedAngle"></label>
+                 <label class="field"><span>Open angle (°)</span><input type="number" min="0" max="270" data-bind="servos.${sv.id}.openAngle"></label>`
+              : `<label class="field"><span>Center (servo ° at joint 0)</span><input type="number" min="0" max="270" step="0.5" data-bind="servos.${sv.id}.center"></label>
+                 <label class="field"><span>Direction</span><label class="chk" style="height:32px"><input type="checkbox" data-bind="servos.${sv.id}.invert"> Invert</label></label>`}
+          <label class="field"><span>Servo travel (°)</span><input type="number" min="90" max="360" data-bind="servos.${sv.id}.range"></label>
+          <label class="field"><span>Min angle (°)</span><input type="number" min="0" max="270" data-bind="servos.${sv.id}.minAngle"></label>
+          <label class="field"><span>Max angle (°)</span><input type="number" min="0" max="270" data-bind="servos.${sv.id}.maxAngle"></label>
+          <label class="field"><span>Pulse at 0° (µs)</span><input type="number" min="300" max="1500" step="10" data-bind="servos.${sv.id}.minUs"></label>
+          <label class="field"><span>Pulse at full travel (µs)</span><input type="number" min="1500" max="2800" step="10" data-bind="servos.${sv.id}.maxUs"></label>
+        </div>
+        <div class="field"><span>Direct drive — raw servo angle <b class="mono" data-raw></b> (bypasses joint mapping, live mode only)</span>
+          <input type="range" min="0" max="180" step="1" data-rawrng></div>
+        <div class="row">
+          ${g ? `<button class="btn sm" data-test="closed">Test closed</button><button class="btn sm" data-test="open">Test open</button>`
+              : `<button class="btn sm" data-test="center">Go to center</button><button class="btn sm" data-setc>Set raw as center</button>`}
+          <button class="btn sm" data-test="min">Test min</button><button class="btn sm" data-test="max">Test max</button>
+          <span class="grow"></span><button class="btn sm ghost" data-release>Release</button>
+        </div>
+      </div>`;
+    const rr = $('[data-rawrng]', d);
+    const drive = a => {
+      const s = cfg.servos[sv.id];
+      state.overrides[sv.id] = clamp(a, 0, s.range); rr.max = s.range; rr.value = state.overrides[sv.id];
+      if (!live() && !drive.warned) { drive.warned = true; toast('Direct drive only moves the real servo in Live mode'); }
+      refreshCalInfo();
+    };
+    rr.addEventListener('input', () => drive(+rr.value));
+    $$('[data-test]', d).forEach(b => b.addEventListener('click', () => {
+      const s = cfg.servos[sv.id], k = b.dataset.test;
+      drive(k === 'center' ? s.center : k === 'min' ? s.minAngle : k === 'max' ? s.maxAngle : k === 'open' ? s.openAngle : s.closedAngle);
+    }));
+    $('[data-setc]', d)?.addEventListener('click', () => {
+      if (!(sv.id in state.overrides)) { toast('Move the direct-drive slider first'); return; }
+      cfg.servos[sv.id].center = state.overrides[sv.id]; saveCfg(); bindAll(d); refreshCalInfo(); toast(`${sv.name} center = ${state.overrides[sv.id]}°`);
+    });
+    $('[data-release]', d).addEventListener('click', () => { delete state.overrides[sv.id]; refreshCalInfo(); });
+    wrap.appendChild(d);
+  }
+  bindAll(wrap);
+  buildLimitTable();
+  refreshCalInfo();
+}
+function refreshCalInfo() {
+  for (const d of $$('#calServos details')) {
+    const id = d.dataset.servo, sv = SERVOS.find(s => s.id === id), s = cfg.servos[id];
+    const a = id in state.overrides ? state.overrides[id] : servoAngle(id, state.current[sv.joint]);
+    $('[data-pin]', d).textContent = 'GP' + s.pin;
+    const out = $('[data-out]', d); out.textContent = `${round(a)}° · ${angleToUs(id, a)} µs${id in state.overrides ? ' · direct' : ''}`;
+    out.className = 'tag' + (id in state.overrides ? ' err' : '');
+    $('[data-raw]', d).textContent = round(a) + '°';
+    const rr = $('[data-rawrng]', d); rr.max = s.range; if (!(id in state.overrides) && document.activeElement !== rr) rr.value = a;
+  }
+}
+function buildLimitTable() {
+  const t = $('#limitTable');
+  t.innerHTML = '<tr><th>Joint</th><th>Min</th><th>Max</th><th>Home</th></tr>' + JOINTS.map(j => `
+    <tr><td>${j.name}</td>
+    <td><input type="number" data-bind="joints.${j.id}.min" data-lim></td>
+    <td><input type="number" data-bind="joints.${j.id}.max" data-lim></td>
+    <td><input type="number" data-bind="joints.${j.id}.home" data-lim></td></tr>`).join('');
+  bindAll(t);
+}
+
+/* =====================================================================
+   Pins UI
+   ===================================================================== */
+const pwmOf = p => `${(p >> 1) & 7}${p & 1 ? 'B' : 'A'}`;
+function pinProblems() {
+  const msgs = [], bad = new Set();
+  const uses = SERVOS.map(s => ({ who: s.name, pin: +cfg.servos[s.id].pin, pwm: true }));
+  if (cfg.led.enabled) uses.push({ who: 'NeoPixel', pin: +cfg.led.pin, pwm: false });
+  for (let i = 0; i < uses.length; i++) for (let k = i + 1; k < uses.length; k++) {
+    const a = uses[i], b = uses[k];
+    if (a.pin === b.pin) { msgs.push(['err', `${a.who} and ${b.who} are both on GP${a.pin}.`]); bad.add(a.who); bad.add(b.who); }
+    else if (a.pwm && b.pwm && pwmOf(a.pin) === pwmOf(b.pin)) { msgs.push(['err', `${a.who} (GP${a.pin}) and ${b.who} (GP${b.pin}) share PWM channel ${pwmOf(a.pin)} — they would always output the same pulse.`]); bad.add(a.who); bad.add(b.who); }
+  }
+  for (const u of uses) if (!PICO_PINS.includes(u.pin)) { msgs.push(['err', `${u.who}: GP${u.pin} is not available on the Pico W.`]); bad.add(u.who); }
+  return { msgs, bad };
+}
+function pinOptions(sel) { return PICO_PINS.map(p => `<option value="${p}"${+sel === p ? ' selected' : ''}>GP${p}</option>`).join(''); }
+function buildPins() {
+  const t = $('#pinTable');
+  t.innerHTML = '<tr><th>Output</th><th>Type</th><th>GPIO</th><th>PWM</th><th></th></tr>' +
+    SERVOS.map(s => `<tr data-who="${esc(s.name)}"><td><b>${s.name}</b></td><td><span class="tag">${s.type}</span></td>
+      <td><select data-bind="servos.${s.id}.pin" data-num>${pinOptions(cfg.servos[s.id].pin)}</select></td><td class="mono small" data-pwm></td><td data-st></td></tr>`).join('') +
+    `<tr data-who="NeoPixel"><td><b>NeoPixel data</b></td><td><span class="tag" id="pinLedType"></span></td>
+      <td><select data-bind="led.pin" data-num>${pinOptions(cfg.led.pin)}</select></td><td class="mono small">PIO</td><td data-st></td></tr>`;
+  bindAll(t);
+  $('#ledPin').innerHTML = pinOptions(cfg.led.pin);
+  refreshPins();
+}
+function refreshPins() {
+  const { msgs, bad } = pinProblems();
+  for (const tr of $$('#pinTable tr[data-who]')) {
+    const who = tr.dataset.who, sv = SERVOS.find(s => s.name === who);
+    if (sv) $('[data-pwm]', tr).textContent = pwmOf(+cfg.servos[sv.id].pin);
+    $('[data-st]', tr).innerHTML = bad.has(who) ? '<span class="tag err">conflict</span>' : '<span class="tag ok">ok</span>';
+    const sel = $('select', tr); const want = sv ? cfg.servos[sv.id].pin : cfg.led.pin; if (+sel.value !== +want) sel.value = want;
+  }
+  $('#pinLedType').textContent = cfg.led.type;
+  $('#pinMsgs').innerHTML = msgs.map(([c, m]) => `<div class="note ${c}">${esc(m)}</div>`).join('');
+  const st = $('#pinState'); st.textContent = msgs.length ? `${msgs.length} problem${msgs.length > 1 ? 's' : ''}` : 'valid'; st.className = 'tag ' + (msgs.length ? 'err' : 'ok');
+  $('#pinApply').disabled = msgs.length > 0;
+  drawPinout();
+  $$('#calServos details').length && refreshCalInfo();
+}
+function drawPinout() {
+  const left = ['GP0', 'GP1', 'GND', 'GP2', 'GP3', 'GP4', 'GP5', 'GND', 'GP6', 'GP7', 'GP8', 'GP9', 'GND', 'GP10', 'GP11', 'GP12', 'GP13', 'GND', 'GP14', 'GP15'];
+  const right = ['VBUS', 'VSYS', 'GND', '3V3_EN', '3V3', 'ADC_VREF', 'GP28', 'AGND', 'GP27', 'GP26', 'RUN', 'GP22', 'GND', 'GP21', 'GP20', 'GP19', 'GP18', 'GND', 'GP17', 'GP16'];
+  const assigned = {};
+  for (const s of SERVOS) (assigned['GP' + cfg.servos[s.id].pin] ||= []).push(s.name);
+  if (cfg.led.enabled) (assigned['GP' + cfg.led.pin] ||= []).push('NeoPixel');
+  const bx = 200, bw = 120, top = 26, dy = 14.4;
+  let s = `<rect x="${bx}" y="8" width="${bw}" height="${top + dy * 20}" rx="8" fill="#1f7a3a" stroke="#14532a"/>
+    <rect x="${bx + bw / 2 - 16}" y="0" width="32" height="18" rx="3" fill="#b8bec6" stroke="#8a9199"/>
+    <rect x="${bx + 35}" y="${top + 60}" width="50" height="50" rx="3" fill="#202326"/>
+    <text x="${bx + bw / 2}" y="${top + 128}" text-anchor="middle" style="fill:#cfe8d6;font-size:9px">RP2040</text>
+    <rect x="${bx + 30}" y="${top + 190}" width="60" height="44" rx="3" fill="#c3c8ce" stroke="#9aa1a8"/>
+    <text x="${bx + bw / 2}" y="${top + 216}" text-anchor="middle" style="fill:#333;font-size:9px">CYW43439</text>`;
+  const pin = (x, y, name, num, side) => {
+    const a = assigned[name], power = /GND|V|3V3|RUN|ADC/.test(name);
+    const fill = a ? (a.length > 1 ? 'var(--danger)' : 'var(--accent)') : power ? (name.includes('GND') ? '#333' : '#c0392b') : '#d4b25c';
+    s += `<circle cx="${x}" cy="${y}" r="4.6" fill="${fill}" stroke="#0d3b1d"/>`;
+    const tx = side === 'L' ? x - 10 : x + 10, anchor = side === 'L' ? 'end' : 'start';
+    s += `<text x="${tx}" y="${y + 3}" text-anchor="${anchor}">${name}</text>`;
+    s += `<text x="${side === 'L' ? x + 9 : x - 9}" y="${y + 3}" text-anchor="${side === 'L' ? 'start' : 'end'}" style="fill:#cfe8d6;font-size:7.5px">${num}</text>`;
+    if (a) s += `<text class="lbl" x="${side === 'L' ? tx - 46 : tx + 46}" y="${y + 3}" text-anchor="${anchor}" style="fill:${a.length > 1 ? 'var(--danger)' : 'var(--accent)'}">${esc(a.join(' + '))}</text>`;
+  };
+  left.forEach((n, i) => pin(bx + 8, top + i * dy + 8, n, i + 1, 'L'));
+  right.forEach((n, i) => pin(bx + bw - 8, top + i * dy + 8, n, 40 - i, 'R'));
+  $('#pinout').innerHTML = s;
+}
+
+/* =====================================================================
+   NeoPixel UI
+   ===================================================================== */
+const ORDERS3 = ['RGB', 'RBG', 'GRB', 'GBR', 'BRG', 'BGR'];
+function ledOrderOptions() {
+  const list = +cfg.led.bpp === 4 ? [...ORDERS3.map(o => o + 'W'), 'WRGB', 'WGRB'] : ORDERS3;
+  if (!list.includes(cfg.led.order)) cfg.led.order = +cfg.led.bpp === 4 ? 'GRBW' : 'GRB';
+  $('#ledOrder').innerHTML = list.map(o => `<option${o === cfg.led.order ? ' selected' : ''}>${o}</option>`).join('');
+}
+function buildLeds() {
+  $('#ledType').innerHTML = Object.keys(LED_TYPES).map(k => `<option>${k}</option>`).join('');
+  $('#swatches').innerHTML = ['#ff0000', '#ff7a00', '#ffd400', '#00ff40', '#00e5ff', '#0078ff', '#7a00ff', '#ff00a8', '#ffffff'].map(c => `<button class="swatch" style="background:${c}" data-c="${c}" title="${c}"></button>`).join('');
+  $$('#swatches .swatch').forEach(b => b.addEventListener('click', () => { cfg.led.color1 = b.dataset.c; if (cfg.led.mode === 'off' || cfg.led.mode === 'rainbow') cfg.led.mode = 'solid'; saveCfg(); bindAll($('#tab-leds')); ledChanged(); }));
+  ledOrderOptions();
+  ledChanged(true);
+}
+function ledChanged(silent) {
+  const L = cfg.led;
+  $('#ledTypeInfo').textContent = LED_TYPES[L.type]?.info || '';
+  $('#ledBriVal').textContent = Math.round(L.brightness / 2.55) + ' %';
+  $('#ledSpdVal').textContent = L.speed;
+  $('#ledWVal').textContent = L.white;
+  $('#ledWField').style.display = +L.bpp === 4 ? '' : 'none';
+  const strip = $('#ledStrip');
+  const n = clamp(+L.count || 0, 0, 300);
+  if (strip.childElementCount !== n) strip.innerHTML = '<span class="led"></span>'.repeat(n);
+  if (!silent) liveLedSend();
+}
+let ledSendT = 0;
+function liveLedSend() {
+  clearTimeout(ledSendT);
+  ledSendT = setTimeout(() => { if (link.connected) link.send(ledPacket(false)); }, 150);
+}
+// Browser preview of the firmware's LED effects (same maths as render_led in main.py)
+function wheel(p) { p = Math.floor(p) % 256; if (p < 0) p += 256; if (p < 85) return [255 - p * 3, p * 3, 0]; if (p < 170) { p -= 85; return [0, 255 - p * 3, p * 3]; } p -= 170; return [p * 3, 0, 255 - p * 3]; }
+let ledT = 0, ledLast = 0;
+function renderLedPreview(now) {
+  if (!$('#tab-leds').classList.contains('on')) return;
+  if (now - ledLast < 33) return; ledLast = now; ledT++;
+  const L = cfg.led, leds = $('#ledStrip').children, n = leds.length; if (!n) return;
+  const b = L.brightness / 255, sp = Math.max(1, L.speed) / 50, t = ledT;
+  const c1 = hexRgb(L.color1), c2 = hexRgb(L.color2), w = +L.bpp === 4 ? +L.white : 0;
+  const mode = L.enabled ? L.mode : 'off';
+  for (let i = 0; i < n; i++) {
+    let c = [0, 0, 0], k = 1;
+    if (mode === 'status') {
+      if (state.estop) c = [255, 0, 0];
+      else if (JOINTS.some(j => Math.abs(state.current[j.id] - state.target[j.id]) > 0.5) && live()) c = [0, 255, 60];
+      else if (link.connected) { c = c1; k = 0.45 + 0.55 * (Math.sin(t * 0.05) + 1) / 2; }
+      else { c = [255, 140, 0]; k = 0.1 + 0.9 * (Math.sin(t * 0.12) + 1) / 2; }
+    } else if (mode === 'solid') c = c1;
+    else if (mode === 'breathe') { c = c1; k = 0.05 + 0.95 * (Math.sin(t * 0.06 * sp) + 1) / 2; }
+    else if (mode === 'rainbow') c = wheel(i * 256 / n + t * 2 * sp);
+    else if (mode === 'chase') { const tail = Math.max(1, n / 3), head = Math.floor(t * 0.25 * sp) % n, d = ((head - i) % n + n) % n; if (d < tail) { c = c1; k = 1 - d / tail; } else { c = c2; k = 0.15; } }
+    else if (mode === 'gradient') { let kk = (i / n + t * 0.004 * sp) % 1; kk = 1 - Math.abs(2 * kk - 1); c = c1.map((v, j) => v + (c2[j] - v) * kk); }
+    else k = 0;
+    const f = b * k, wv = w * f;
+    // Show white channel additively; boost dim values a bit so the preview stays readable
+    const rgb = c.map(v => Math.min(255, Math.round(v * f + wv)));
+    const lum = Math.max(...rgb);
+    leds[i].style.background = lum < 3 ? '#1b1d21' : `rgb(${rgb.join(',')})`;
+    leds[i].style.boxShadow = lum < 3 ? '0 0 0 1px #333 inset' : `0 0 ${4 + lum / 18}px rgb(${rgb.join(',')})`;
+  }
+}
+
+/* =====================================================================
+   Generic data binding for settings fields
+   ===================================================================== */
+function bindAll(root = document) {
+  for (const el of $$('[data-bind]', root)) {
+    const p = el.dataset.bind, v = getPath(p);
+    if (el.type === 'checkbox') el.checked = !!v; else if (v !== undefined && document.activeElement !== el) el.value = v;
+    if (el._bound) continue;
+    el._bound = true;
+    const ev = el.tagName === 'SELECT' || el.type === 'checkbox' ? 'change' : 'input';
+    el.addEventListener(ev, () => {
+      let val;
+      if (el.type === 'checkbox') val = el.checked;
+      else if (el.type === 'number' || el.type === 'range' || 'num' in el.dataset) { val = parseFloat(el.value); if (Number.isNaN(val)) return; }
+      else val = el.value;
+      setPath(p, val); saveCfg(); onBind(p, el);
+    });
+  }
+}
+function onBind(p, el) {
+  if (p === 'speed') $('#speedVal').textContent = cfg.speed + ' %';
+  if (p.startsWith('geometry') || p === 'wristMode') { if (p.startsWith('geometry') && !(+getPath(p) > 0)) return; rebuildModel(); ikRanges(); syncIkFromTarget(); updateWarnings(); }
+  if (p.startsWith('joints.')) {
+    const [, id, k] = p.split('.'), L = cfg.joints[id];
+    if (k !== 'home' && L.min >= L.max) return;
+    L.home = clamp(L.home, L.min, L.max);
+    state.target[id] = clamp(state.target[id], L.min, L.max);
+    buildJointRows(); syncIkFromTarget();
+  }
+  if (p.startsWith('servos.')) { if (p.endsWith('.pin')) refreshPins(); refreshCalInfo(); link.lastSent = ''; }
+  if (p.startsWith('led.')) {
+    if (p === 'led.type') {
+      const T = LED_TYPES[cfg.led.type];
+      if (T.order) Object.assign(cfg.led, { order: T.order, bpp: T.bpp, khz: T.khz });
+      ledOrderOptions(); bindAll($('#tab-leds'));
+    }
+    if (p === 'led.bpp') ledOrderOptions();
+    if (p === 'led.pin' || p === 'led.enabled') refreshPins();
+    if (p === 'led.pin') bindAll($('#tab-pins')), bindAll($('#tab-leds'));
+    ledChanged();
+  }
+  if (p.startsWith('view.')) applyView();
+  if (p.startsWith('sim.')) { if (p === 'sim.tolerance') updateTargets(); }
+  if (p === 'safety.floor') ikRanges();
+  if (p.startsWith('conn.')) { updateConn(); connHint(); }
+}
+function connHint() {
+  $('#connHint').textContent = cfg.conn.transport === 'serial'
+    ? 'USB: plug the Pico into this computer. Works in Chrome/Edge on desktop. Close Thonny first — only one program can use the port.'
+    : `Wi-Fi: will connect to ${link.wsUrl()}. Leave the host empty when this page is served by the Pico itself.`;
+}
+
+/* =====================================================================
+   Theme
+   ===================================================================== */
+const THEME_ICON = { auto: '◐', light: '☀', dark: '☾' };
+const mql = matchMedia('(prefers-color-scheme: dark)');
+function applyTheme() {
+  document.documentElement.dataset.theme = cfg.theme;
+  $('#themeBtn').textContent = THEME_ICON[cfg.theme];
+  $('#themeBtn').title = `Theme: ${cfg.theme === 'auto' ? 'both (follows system)' : cfg.theme}`;
+  $$('#themeSeg button').forEach(b => b.classList.toggle('on', b.dataset.theme === cfg.theme));
+  requestAnimationFrame(() => view.themeChanged?.());
+}
+mql.addEventListener?.('change', () => cfg.theme === 'auto' && view.themeChanged?.());
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+/* =====================================================================
+   3D view (three.js) with a 2D fallback when three.js can't be loaded
+   ===================================================================== */
+const view = {};
+let THREE = null;
+async function init3D() {
+  try {
+    THREE = await import('three');
+    const { OrbitControls } = await import('three/addons/controls/OrbitControls.js');
+    view.OrbitControls = OrbitControls;
+  } catch (e) {
+    log('3D library unavailable (offline?) — using the 2D schematic view', 'er');
+    init2D(); return;
+  }
+  const canvas = $('#scene');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(42, 1, 2, 6000);
+  const controls = new view.OrbitControls(camera, canvas);
+  controls.enableDamping = true; controls.dampingFactor = 0.12; controls.maxPolarAngle = Math.PI * 0.495;
+  controls.minDistance = 120; controls.maxDistance = 2500;
+  Object.assign(view, { renderer, scene, camera, controls, canvas });
+
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.3));
+  const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+  sun.position.set(300, 700, 350); sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, { left: -500, right: 500, top: 500, bottom: -500, near: 10, far: 2000 });
+  sun.shadow.bias = -0.0005;
+  scene.add(sun); view.sun = sun;
+  const fill = new THREE.DirectionalLight(0xffffff, 0.45); fill.position.set(-400, 300, -300); scene.add(fill);
+
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.ShadowMaterial({ opacity: 0.18 }));
+  ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+
+  // Robot frame (Z up) inside three's Y-up world
+  const root = new THREE.Group(); root.rotation.x = -Math.PI / 2; scene.add(root); view.root = root;
+
+  view.mats = {
+    dark:   new THREE.MeshStandardMaterial({ color: 0x30353d, roughness: 0.55, metalness: 0.2 }),
+    link:   new THREE.MeshStandardMaterial({ color: 0xd5dae1, roughness: 0.35, metalness: 0.55 }),
+    accent: new THREE.MeshStandardMaterial({ color: 0xf26b1d, roughness: 0.45, metalness: 0.1 }),
+    black:  new THREE.MeshStandardMaterial({ color: 0x18191b, roughness: 0.6 }),
+    blue:   new THREE.MeshStandardMaterial({ color: 0x2f6fdc, roughness: 0.45 }),
+    hub:    new THREE.MeshStandardMaterial({ color: 0xa4acb6, roughness: 0.3, metalness: 0.8 }),
+    pad:    new THREE.MeshStandardMaterial({ color: 0x23262b, roughness: 0.9 }),
+  };
+  view.ghostMat = new THREE.MeshBasicMaterial({ color: 0x2f7cf6, transparent: true, opacity: 0.22, depthWrite: false });
+  view.ghostMat2 = new THREE.MeshBasicMaterial({ color: 0x1fbf6a, transparent: true, opacity: 0.25, depthWrite: false });
+
+  // markers
+  view.ikMarker = new THREE.Mesh(new THREE.SphereGeometry(5, 20, 14), new THREE.MeshBasicMaterial({ color: 0x2f7cf6 }));
+  view.ikMarker.add(new THREE.Mesh(new THREE.SphereGeometry(9, 20, 14), new THREE.MeshBasicMaterial({ color: 0x2f7cf6, transparent: true, opacity: 0.2, depthWrite: false })));
+  root.add(view.ikMarker);
+  view.target = new THREE.Mesh(new THREE.SphereGeometry(1, 28, 18), new THREE.MeshStandardMaterial({ color: 0x1fd16b, emissive: 0x0c8a42, transparent: true, opacity: 0.55, depthWrite: false }));
+  view.target.visible = false; root.add(view.target);
+  view.axes = new THREE.AxesHelper(120); root.add(view.axes);
+  view.trailGeo = new THREE.BufferGeometry();
+  view.trail = new THREE.Line(view.trailGeo, new THREE.LineBasicMaterial({ color: 0xf26b1d }));
+  view.trail.frustumCulled = false; root.add(view.trail); view.trailPts = [];
+
+  rebuildModel();
+  view.themeChanged = () => {
+    scene.background = new THREE.Color(cssVar('--scene-bg'));
+    if (view.grid) { scene.remove(view.grid); view.grid.geometry.dispose(); }
+    view.grid = new THREE.GridHelper(1200, 48, new THREE.Color(cssVar('--grid1')), new THREE.Color(cssVar('--grid2')));
+    view.grid.position.y = 0.2; scene.add(view.grid);
+    applyView();
+  };
+  view.themeChanged();
+
+  const ro = new ResizeObserver(() => {
+    const r = $('#viewer').getBoundingClientRect();
+    renderer.setSize(r.width, r.height, false); camera.aspect = r.width / Math.max(1, r.height); camera.updateProjectionMatrix();
+  });
+  ro.observe($('#viewer'));
+  setCam('iso');
+
+  // Shift+click on the floor = IK target (x,y), keeps current z
+  let down = null;
+  canvas.addEventListener('pointerdown', e => { down = { x: e.clientX, y: e.clientY, shift: e.shiftKey }; });
+  canvas.addEventListener('pointerup', e => {
+    if (!down || !down.shift || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 5) { down = null; return; }
+    down = null;
+    const r = canvas.getBoundingClientRect();
+    const ndc = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    const rc = new THREE.Raycaster(); rc.setFromCamera(ndc, camera);
+    const hit = new THREE.Vector3();
+    if (rc.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hit)) {
+      state.ik.x = hit.x; state.ik.y = -hit.z; writeIkFields(); ikGo();
+    }
+  });
+  view.ready = true;
+}
+function setCam(k) {
+  if (!view.camera) return;
+  const c = { iso: [520, 400, 520], front: [700, 220, 0], side: [0, 220, 700], top: [0, 900, 1] }[k];
+  view.camera.position.set(...c); view.controls.target.set(0, 140, 0); view.controls.update();
+}
+function rebuildModel() {
+  if (!view.root) return;
+  for (const k of ['arm', 'ghost', 'ghost2']) if (view[k]) { view.root.remove(view[k].group); view[k].group.traverse(o => o.geometry?.dispose()); }
+  view.arm = buildArm(null); view.root.add(view.arm.group);
+  view.ghost = buildArm(view.ghostMat); view.ghost.group.visible = false; view.root.add(view.ghost.group);
+  view.ghost2 = buildArm(view.ghostMat2); view.ghost2.group.visible = false; view.root.add(view.ghost2.group);
+  if (view.ring) { view.root.remove(view.ring); view.ring.geometry.dispose(); }
+  const R = reach();
+  view.ring = new THREE.Mesh(new THREE.RingGeometry(R - 1.5, R + 1.5, 160), new THREE.MeshBasicMaterial({ color: 0xf26b1d, transparent: true, opacity: 0.45, side: THREE.DoubleSide }));
+  view.ring.position.z = 0.6; view.root.add(view.ring);
+  view.trailPts = [];
+  applyView();
+}
+// Builds the arm with the same joint chain as fk(). Units: mm, Z up.
+function buildArm(ghostMat) {
+  const g = cfg.geometry, M = view.mats;
+  const mat = k => ghostMat || M[k];
+  const add = (parent, mesh, x = 0, y = 0, z = 0) => { mesh.position.set(x, y, z); if (!ghostMat) { mesh.castShadow = true; mesh.receiveShadow = true; } parent.add(mesh); return mesh; };
+  const box = (w, d, h, k) => new THREE.Mesh(new THREE.BoxGeometry(w, d, h), mat(k));
+  const cylZ = (r, h, k, seg = 40) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, seg), mat(k)); m.rotation.x = Math.PI / 2; return m; };
+  const cylY = (r, h, k, seg = 32) => new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, seg), mat(k));
+  const group = new THREE.Group();
+  const bh = Math.min(34, g.H * 0.35);
+
+  // fixed base
+  add(group, cylZ(72, 10, 'dark'), 0, 0, 5);
+  add(group, cylZ(56, bh - 10, 'dark'), 0, 0, 10 + (bh - 10) / 2);
+  // turret (base servo)
+  const turret = new THREE.Group(); turret.position.z = bh; group.add(turret);
+  add(turret, cylZ(54, 6, 'accent'), 0, 0, 3);
+  const sh = g.H - bh;
+  for (const s of [-1, 1]) {
+    add(turret, box(46, 6, sh + 14, 'accent'), 0, s * 36, (sh + 14) / 2);
+    add(turret, box(40, 38, 20, 'black'), -8, s * 58, sh);          // shoulder MG996R pair
+  }
+  add(turret, cylY(15, 118, 'hub'), 0, 0, sh);
+  // shoulder
+  const shoulder = new THREE.Group(); shoulder.position.z = sh; turret.add(shoulder);
+  for (const s of [-1, 1]) add(shoulder, box(24, 5, g.L1 + 22, 'link'), 0, s * 29, g.L1 / 2);
+  add(shoulder, box(18, 54, 10, 'link'), 0, 0, g.L1 * 0.5);
+  // elbow
+  const elbow = new THREE.Group(); elbow.position.z = g.L1; shoulder.add(elbow);
+  add(elbow, cylY(13, 66, 'hub'), 0, 0, 0);
+  add(elbow, box(20, 20, 40, 'black'), 0, -42, 6);                  // elbow MG996R
+  add(elbow, box(24, 30, g.L2 + 10, 'link'), 0, 0, g.L2 / 2 + 2);
+  add(elbow, box(26, 32, 6, 'accent'), 0, 0, g.L2 * 0.45);
+  // wrist (yaw / pitch)
+  const wrist = new THREE.Group(); wrist.position.z = g.L2; elbow.add(wrist);
+  const whub = add(wrist, cylY(9, 34, 'hub'), 0, 0, 0);
+  if (cfg.wristMode !== 'pitch') whub.rotation.z = Math.PI / 2;
+  add(elbow, box(12, 23, 24, 'blue'), 0, 21, g.L2 - 8);             // wrist MG90S
+  add(wrist, box(20, 22, g.Lw - 8, 'link'), 0, 0, (g.Lw - 8) / 2 + 4);
+  add(wrist, box(23, 12, 22, 'blue'), 0, 0, g.Lw - 12);              // roll MG90S
+  // roll + gripper
+  const roll = new THREE.Group(); roll.position.z = g.Lw; wrist.add(roll);
+  add(roll, cylZ(11, 4, 'hub'), 0, 0, 2);
+  add(roll, box(46, 14, 16, 'accent'), 0, 0, 12);
+  add(roll, box(23, 12, 22, 'blue'), 0, 13, 13);                     // gripper MG90S
+  const fl = Math.max(20, g.Lg - 20);
+  const fL = add(roll, box(10, 5, fl, 'link'), 0, 6, 20 + fl / 2);
+  const fR = add(roll, box(10, 5, fl, 'link'), 0, -6, 20 + fl / 2);
+  for (const f of [fL, fR]) add(f, box(11, 2, fl * 0.45, 'pad'), 0, 0, fl * 0.25).userData.pad = true;
+  fR.children[0].position.y = 3; fL.children[0].position.y = -3;
+  return { group, turret, shoulder, elbow, wrist, roll, fL, fR };
+}
+function poseModel(m, q) {
+  m.turret.rotation.z = q.base * D2R;
+  m.shoulder.rotation.y = q.shoulder * D2R;
+  m.elbow.rotation.y = (90 - q.elbow) * D2R;
+  if (cfg.wristMode === 'pitch') m.wrist.rotation.set(0, -q.wrist * D2R, 0); else m.wrist.rotation.set(q.wrist * D2R, 0, 0);
+  m.roll.rotation.z = q.roll * D2R;
+  const gap = 4 + q.gripper / 100 * 20;
+  m.fL.position.y = gap; m.fR.position.y = -gap;
+}
+function applyView() {
+  if (!view.ready && !view.root) return;
+  const v = cfg.view;
+  if (view.grid) view.grid.visible = v.grid;
+  if (view.ring) view.ring.visible = v.envelope;
+  if (view.axes) view.axes.visible = v.axes;
+  if (view.renderer) { view.sun.castShadow = v.shadows; }
+  if (view.trail) { view.trail.visible = v.trail; if (!v.trail) view.trailPts = []; }
+  updateIkMarker();
+}
+function updateIkMarker() {
+  if (!view.ikMarker) return;
+  view.ikMarker.visible = cfg.view.ikMarker;
+  view.ikMarker.position.set(state.ik.x, state.ik.y, state.ik.z);
+}
+function updateTargets() {
+  if (!view.target) return;
+  view.target.visible = !!prac.target;
+  if (prac.target) { view.target.position.set(prac.target.x, prac.target.y, prac.target.z); view.target.scale.setScalar(+cfg.sim.tolerance); }
+}
+function render3D(now) {
+  if (!view.ready) { if (view.ctx) render2D(); return; }
+  poseModel(view.arm, state.current);
+  const showCmd = cfg.sim.ghost && JOINTS.some(j => Math.abs(state.current[j.id] - state.target[j.id]) > 1);
+  view.ghost.group.visible = showCmd; if (showCmd) poseModel(view.ghost, state.target);
+  view.ghost2.group.visible = !!prac.ghostQ; if (prac.ghostQ) poseModel(view.ghost2, prac.ghostQ);
+  updateTargets();
+  if (view.target.visible) view.target.material.opacity = 0.35 + 0.25 * Math.sin(now / 200) + (prac.holdStart ? 0.3 : 0);
+  if (cfg.view.trail) {
+    const tip = fk(state.current).tip, last = view.trailPts[view.trailPts.length - 1];
+    if (!last || Math.hypot(tip.x - last.x, tip.y - last.y, tip.z - last.z) > 1.5) {
+      view.trailPts.push(new THREE.Vector3(tip.x, tip.y, tip.z)); if (view.trailPts.length > 600) view.trailPts.shift();
+      view.trailGeo.setFromPoints(view.trailPts);
+    }
+  }
+  // tint the arm red when it would hit the table
+  const hit = belowFloor(fk(state.current));
+  view.mats.link.emissive.setHex(hit ? 0x661111 : 0x000000);
+  view.controls.update();
+  view.renderer.render(view.scene, view.camera);
+}
+
+/* ---------- 2D fallback (side + top view) ---------- */
+function init2D() {
+  view.ctx = $('#scene').getContext('2d');
+  $('#viewHint').textContent = '2D schematic view (3D library could not be loaded). Left: side view · right: top view.';
+  $$('[data-cam]').forEach(b => b.style.display = 'none');
+}
+function render2D() {
+  const c = view.ctx, cv = c.canvas, r = $('#viewer').getBoundingClientRect(), dpr = Math.min(devicePixelRatio, 2);
+  if (cv.width !== Math.round(r.width * dpr) || cv.height !== Math.round(r.height * dpr)) { cv.width = r.width * dpr; cv.height = r.height * dpr; }
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.fillStyle = cssVar('--scene-bg'); c.fillRect(0, 0, r.width, r.height);
+  const f = fk(state.current), R = reach(), H = cfg.geometry.H;
+  const half = r.width / 2, s = Math.min(half / (R * 1.25), r.height / ((R + H) * 1.3));
+  const draw = (ox, oy, map, label) => {
+    c.strokeStyle = cssVar('--grid2'); c.lineWidth = 1; c.beginPath(); c.moveTo(ox - R * s, oy); c.lineTo(ox + R * s, oy); c.stroke();
+    c.fillStyle = cssVar('--muted'); c.font = '12px system-ui'; c.fillText(label, Math.max(12, ox - half * 0.45), 60);
+    const P = f.pts.map(map);
+    c.lineCap = 'round'; c.lineJoin = 'round';
+    c.strokeStyle = cssVar('--accent'); c.lineWidth = 10; c.beginPath(); P.forEach(([x, y], i) => i ? c.lineTo(ox + x * s, oy - y * s) : c.moveTo(ox + x * s, oy - y * s)); c.stroke();
+    c.fillStyle = cssVar('--text'); P.forEach(([x, y]) => { c.beginPath(); c.arc(ox + x * s, oy - y * s, 4, 0, 7); c.fill(); });
+    if (prac.target) { const [x, y] = map(prac.target); c.strokeStyle = '#1fbf6a'; c.lineWidth = 2; c.beginPath(); c.arc(ox + x * s, oy - y * s, cfg.sim.tolerance * s, 0, 7); c.stroke(); }
+    if (cfg.view.ikMarker) { const [x, y] = map(state.ik); c.fillStyle = cssVar('--blue'); c.beginPath(); c.arc(ox + x * s, oy - y * s, 5, 0, 7); c.fill(); }
+  };
+  const yaw = state.current.base * D2R;
+  draw(half * 0.5, r.height * 0.8, p => [p.x * Math.cos(yaw) + p.y * Math.sin(yaw), p.z], 'SIDE (arm plane)');
+  draw(half * 1.5, r.height * 0.55, p => [-p.y, p.x], 'TOP');
+}
+
+/* =====================================================================
+   Readouts & warnings
+   ===================================================================== */
+let roLast = 0;
+function updateReadout(now) {
+  if (now - roLast < 100) return; roLast = now;
+  const f = fk(state.current), q = state.current;
+  $('#readout').innerHTML =
+    `<b>X</b><span>${round(f.tip.x)} mm</span><b>Y</b><span>${round(f.tip.y)} mm</span><b>Z</b><span>${round(f.tip.z)} mm</span><b>Pitch</b><span>${round(f.pitch)}°</span>` +
+    JOINTS.map(j => `<b>${j.name.replace('Wrist ', 'W.')}</b><span>${round(q[j.id])}${j.unit}</span>`).join('');
+  refreshJointNow();
+  if ($('#tab-calib').classList.contains('on')) refreshCalInfo();
+  updateWarnings();
+}
+function updateWarnings() {
+  const w = [];
+  if (state.estop) w.push('E-STOP active — servos released');
+  if (belowFloor(fk(state.current))) w.push('Arm is below the table surface!');
+  if (live() && !link.connected) w.push('Live mode: not connected');
+  if (Object.keys(state.overrides).length && live()) w.push('Direct drive active (calibration)');
+  const b = $('#warnBox'); b.style.display = w.length ? 'block' : 'none'; b.innerHTML = w.map(esc).join('<br>');
+}
+
+/* =====================================================================
+   Main loop
+   ===================================================================== */
+let lastT = performance.now();
+function tick(now) {
+  const dt = Math.min(0.1, (now - lastT) / 1000); lastT = now;
+  // keyboard: continuous joint / IK jogging
+  if (state.keys.size && !state.estop) {
+    for (const j of JOINTS) {
+      const d = (state.keys.has(j.keys[0]) ? 1 : 0) - (state.keys.has(j.keys[1]) ? 1 : 0);
+      if (d) setJoint(j.id, state.target[j.id] + d * Math.max(20, jointSpeed(j.id) * 0.6) * dt, 'key');
+    }
+    const v = 120 * cfg.speed / 100 * dt;
+    const k = state.keys;
+    const dx = (k.has('arrowup') ? 1 : 0) - (k.has('arrowdown') ? 1 : 0);
+    const dy = (k.has('arrowleft') ? 1 : 0) - (k.has('arrowright') ? 1 : 0);
+    const dz = (k.has('pageup') ? 1 : 0) - (k.has('pagedown') ? 1 : 0);
+    if (dx) ikJog('x', dx * v, true); if (dy) ikJog('y', dy * v, true); if (dz) ikJog('z', dz * v, true);
+  }
+  // move "current" towards "target" at the servos' speed
+  if (!state.estop) {
+    const instant = !live() && !cfg.sim.realistic;
+    for (const j of JOINTS) {
+      const t = state.target[j.id], c = state.current[j.id];
+      if (instant) state.current[j.id] = t;
+      else { const m = jointSpeed(j.id) * dt; state.current[j.id] = c + clamp(t - c, -m, m); }
+    }
+  }
+  stepSeq(now);
+  prac.tick(now);
+  sendPositions(now);
+  render3D(now);
+  updateReadout(now);
+  updateHud(now);
+  renderLedPreview(now);
+  requestAnimationFrame(tick);
+}
+
+/* =====================================================================
+   Firmware export & config import/export
+   ===================================================================== */
+function download(name, text, type = 'text/plain') {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+function firmware() {
+  const pk = cfgPacket(false), lp = ledPacket(false);
+  const fwCfg = { servos: pk.servos, led: pk.led, fx: lp.fx };
+  const apPass = $('#fwApPass').value;
+  if (apPass.length < 8) { toast('Access-point password must be at least 8 characters'); return null; }
+  if (pinProblems().msgs.length) { toast('Fix the pin conflicts first'); return null; }
+  return $('#fwTemplate').textContent.replace(/^\n/, '')
+    .replace('{{SSID}}', () => JSON.stringify($('#fwSsid').value))
+    .replace('{{PASS}}', () => JSON.stringify($('#fwPass').value))
+    .replace('{{AP}}', () => $('#fwAp').checked || !$('#fwSsid').value ? 'True' : 'False')
+    .replace('{{AP_SSID}}', () => JSON.stringify($('#fwApSsid').value || 'ArmCtl-Pico'))
+    .replace('{{AP_PASS}}', () => JSON.stringify(apPass))
+    .replace('{{CFG}}', () => JSON.stringify(fwCfg).replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
+}
+
+/* =====================================================================
+   Wiring up events
+   ===================================================================== */
+function setupEvents() {
+  // tabs
+  $$('#tabs button').forEach(b => b.addEventListener('click', () => {
+    $$('#tabs button').forEach(x => x.classList.toggle('on', x === b));
+    $$('.panel').forEach(p => p.classList.toggle('on', p.id === 'tab-' + b.dataset.tab));
+    if (b.dataset.tab !== 'calib' && Object.keys(state.overrides).length) { state.overrides = {}; link.lastSent = ''; }
+    if (b.dataset.tab === 'calib') refreshCalInfo();
+  }));
+  // header
+  $$('#modeSeg button').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+  $('#connBtn').addEventListener('click', () => (link.connected || link.connecting) ? link.close() : link.open());
+  $('#themeBtn').addEventListener('click', () => { cfg.theme = { auto: 'light', light: 'dark', dark: 'auto' }[cfg.theme]; saveCfg(); applyTheme(); });
+  $$('#themeSeg button').forEach(b => b.addEventListener('click', () => { cfg.theme = b.dataset.theme; saveCfg(); applyTheme(); }));
+  $('#estopBtn').addEventListener('click', () => setEstop(!state.estop));
+  $$('[data-cam]').forEach(b => b.addEventListener('click', () => setCam(b.dataset.cam)));
+  // control
+  $('#homeBtn').addEventListener('click', () => setPose(homePose()));
+  $('#gripOpen').addEventListener('click', () => setJoint('gripper', cfg.joints.gripper.max));
+  $('#gripClose').addEventListener('click', () => setJoint('gripper', cfg.joints.gripper.min));
+  $('#poseSave').addEventListener('click', () => {
+    const name = $('#poseName').value.trim() || `Pose ${cfg.poses.length + 1}`;
+    cfg.poses.push({ name, q: snap(state.target) }); $('#poseName').value = ''; saveCfg(); renderPoses(); toast(`Saved “${name}”`);
+  });
+  $('#poseName').addEventListener('keydown', e => { if (e.key === 'Enter') $('#poseSave').click(); });
+  $('#seqPlay').addEventListener('click', playSeq);
+  $('#seqStop').addEventListener('click', stopSeq);
+  $('#seqClear').addEventListener('click', () => { stopSeq(); cfg.sequence = []; saveCfg(); renderSeq(); });
+  // simulator
+  $('#simEnter').addEventListener('click', () => setMode('sim'));
+  $('#pracReach').addEventListener('click', () => prac.active && prac.kind === 'reach' ? prac.stop(false) : prac.begin('reach'));
+  $('#pracPose').addEventListener('click', () => prac.active && prac.kind === 'pose' ? prac.stop(false) : prac.begin('pose'));
+  $('#pracReset').addEventListener('click', () => { cfg.practice.best = {}; saveCfg(); renderPrac(); });
+  // calibration
+  $('#calRelease').addEventListener('click', () => { state.overrides = {}; link.lastSent = ''; refreshCalInfo(); });
+  $('#setHome').addEventListener('click', () => {
+    for (const j of JOINTS) cfg.joints[j.id].home = round(state.target[j.id]); saveCfg(); bindAll($('#limitTable')); toast('Home pose updated');
+  });
+  $('#calReset').addEventListener('click', () => {
+    if (!confirm('Reset all servo calibration, joint limits, geometry and speeds? Pins are kept.')) return;
+    const pins = Object.fromEntries(SERVOS.map(s => [s.id, cfg.servos[s.id].pin]));
+    for (const k of ['servos', 'joints', 'geometry', 'typeSpeed', 'wristMode']) cfg[k] = structuredClone(DEFAULT_CFG[k]);
+    for (const s of SERVOS) cfg.servos[s.id].pin = pins[s.id];
+    saveCfg(); buildCalibration(); bindAll(); buildJointRows(); rebuildModel(); ikRanges(); syncIkFromTarget(); toast('Calibration reset');
+  });
+  // pins
+  $('#pinApply').addEventListener('click', () => {
+    if (!link.connected) { toast('Connect to the Pico first (pins are also saved here and in the firmware export)'); return; }
+    link.send(cfgPacket($('#pinSave').checked)); link.lastSent = ''; toast('Pin configuration sent');
+  });
+  $('#pinDefaults').addEventListener('click', () => {
+    for (const s of SERVOS) cfg.servos[s.id].pin = DEFAULT_CFG.servos[s.id].pin;
+    cfg.led.pin = DEFAULT_CFG.led.pin; saveCfg(); bindAll(); refreshPins();
+  });
+  // leds
+  $('#ledApply').addEventListener('click', () => {
+    if (!link.connected) { toast('Connect to the Pico first'); return; }
+    link.send(cfgPacket(true)); link.send(ledPacket(true)); toast('LED settings sent and saved on the Pico');
+  });
+  // settings
+  $('#fwDownload').addEventListener('click', () => { const t = firmware(); if (t) { download('main.py', t, 'text/x-python'); toast('main.py downloaded'); } });
+  $('#cfgExport').addEventListener('click', () => download('armctl-settings.json', JSON.stringify(cfg, null, 2), 'application/json'));
+  $('#cfgImport').addEventListener('click', () => $('#cfgFile').click());
+  $('#cfgFile').addEventListener('change', async e => {
+    const f = e.target.files[0]; if (!f) return;
+    try { cfg = merge(DEFAULT_CFG, JSON.parse(await f.text())); saveCfg(); location.reload(); }
+    catch (err) { toast('Could not read that file: ' + err.message); }
+    e.target.value = '';
+  });
+  $('#cfgReset').addEventListener('click', () => {
+    if (!confirm('Reset ALL settings, poses and calibration to defaults?')) return;
+    try { localStorage.removeItem(CFG_KEY); } catch (e) {}
+    clearTimeout(saveTimer); location.reload();
+  });
+  $('#logClear').addEventListener('click', () => $('#console').innerHTML = '');
+  $('#rawSend').addEventListener('click', () => {
+    const v = $('#rawCmd').value.trim(); if (!v) return;
+    try { if (!link.send(JSON.parse(v))) toast('Not connected'); } catch (e) { toast('Not valid JSON'); }
+  });
+
+  // keyboard
+  const typing = e => /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName) && e.target.type !== 'range' && e.target.type !== 'checkbox';
+  const JOG_KEYS = ['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'pageup', 'pagedown'];
+  addEventListener('keydown', e => {
+    if (e.key === 'Escape') { e.preventDefault(); setEstop(!state.estop); return; }
+    if (typing(e) || e.ctrlKey || e.metaKey || e.altKey) return;
+    const k = e.key.toLowerCase();
+    if (k === 'home') { e.preventDefault(); setPose(homePose()); return; }
+    if (JOINTS.some(j => j.keys.includes(k)) || JOG_KEYS.includes(k)) {
+      e.preventDefault();
+      if (JOG_KEYS.includes(k) && !state.keys.has(k)) syncIkFromTarget();
+      state.keys.add(k);
+    }
+  });
+  addEventListener('keyup', e => state.keys.delete(e.key.toLowerCase()));
+  addEventListener('blur', () => state.keys.clear());
+}
+
+/* =====================================================================
+   Boot
+   ===================================================================== */
+function boot() {
+  setupEvents();
+  buildJointRows();
+  setupIk();
+  buildCalibration();
+  buildPins();
+  buildLeds();
+  bindAll();
+  $('#speedVal').textContent = cfg.speed + ' %';
+  applyTheme();
+  renderMode();
+  renderPoses(); renderSeq(); renderPrac();
+  updateConn(); connHint();
+  syncIkFromTarget();
+  init3D().then(() => applyView());
+  requestAnimationFrame(tick);
+  log('ArmCtl ready. Mode: ' + cfg.mode);
+}
+boot();
+</script>
+</body>
+</html>
