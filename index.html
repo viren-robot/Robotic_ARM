@@ -199,7 +199,7 @@ details.servo summary::-webkit-details-marker { display: none; }
 details.servo summary::before { content: "▸"; color: var(--muted); transition: transform .15s; }
 details.servo[open] summary::before { transform: rotate(90deg); }
 details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: column; gap: 10px; }
-.tag { font-size: 11px; font-family: var(--mono); padding: 1px 6px; border-radius: 5px; background: var(--panel); border: 1px solid var(--border); color: var(--muted); font-weight: 500; }
+.tag { white-space: nowrap; font-size: 11px; font-family: var(--mono); padding: 1px 6px; border-radius: 5px; background: var(--panel); border: 1px solid var(--border); color: var(--muted); font-weight: 500; }
 .tag.err { color: var(--danger); border-color: var(--danger); }
 .tag.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 50%, transparent); }
 .pinout { width: 100%; max-width: 520px; display: block; margin: 0 auto; }
@@ -265,6 +265,7 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
       <button data-tab="control" class="on">Control</button>
       <button data-tab="anim">Animate</button>
       <button data-tab="sim">Simulator</button>
+      <button data-tab="safety">Safety</button>
       <button data-tab="calib">Calibration</button>
       <button data-tab="pins">Pin assignments</button>
       <button data-tab="leds">NeoPixel</button>
@@ -432,6 +433,46 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
       </div>
     </div>
 
+    <!-- ================= SAFETY ================= -->
+    <div class="panel" id="tab-safety">
+      <div class="card">
+        <div class="head"><h3>Safety system</h3><span class="tag" id="safeState"></span></div>
+        <div class="tablewrap"><table id="safeTable"></table></div>
+      </div>
+      <div class="card">
+        <div class="head"><h3>Collision guard</h3><label class="chk small"><input type="checkbox" data-bind="safety.collide"> On</label></div>
+        <p class="small muted">Checks every move before it happens — sliders, keyboard, IK, the blue ball, poses and animations, in Simulator and Live. A move that would make any part hit the table, the base or the upper arm is stopped and the arm stays where it is. Moves out of a collision are always allowed.</p>
+        <div class="grid3">
+          <label class="field"><span>Clearance above the table (mm)</span><input type="number" min="0" max="50" step="1" data-bind="safety.floorMargin"></label>
+          <label class="field"><span>Clearance around the base & upper arm (mm)</span><input type="number" min="0" max="30" step="1" data-bind="safety.gap"></label>
+        </div>
+      </div>
+      <div class="card">
+        <div class="head"><h3>Gentle motion</h3></div>
+        <p class="small muted">Servos speed up and slow down smoothly instead of jumping, which is easier on the MG90S gears and the printed parts. Max speed is set under Calibration → Servo speeds.</p>
+        <div class="grid3">
+          <label class="field"><span>Acceleration (°/s²)</span><input type="number" min="100" max="20000" step="100" data-bind="safety.accel"></label>
+        </div>
+      </div>
+      <div class="card">
+        <div class="head"><h3>On the Pico</h3><span class="tag" id="fwSafeTag"></span></div>
+        <p class="small muted">These run inside <code>main.py</code>, so they protect the arm even if the page, the browser or the USB cable misbehaves. They're sent to the Pico when you connect. After updating this page, download <code>main.py</code> again (Settings).</p>
+        <div class="grid3">
+          <label class="field"><span>Pico speed limit (°/s)</span><input type="number" min="30" max="1000" step="10" data-bind="safety.fwSlew"></label>
+          <label class="field"><span>Hold if no commands for (s)</span><input type="number" min="0.5" max="30" step="0.5" data-bind="safety.timeout"></label>
+          <label class="field"><span>E-STOP</span><select data-bind="safety.estopMode"><option value="hold">Freeze in place (recommended)</option><option value="release">Release servos (arm goes limp)</option></select></label>
+        </div>
+        <ul class="small muted" style="margin:10px 0 0;padding-left:18px">
+          <li>Every pulse is clamped to the servo's Min/Max angle from Calibration, so a joint is never driven past its range.</li>
+          <li>Freeze holds the arm up; Release lets it drop, which can hit the table. Use Release only if something is jammed.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="head"><h3>Safety log</h3><button class="btn sm ghost" id="safeClear">Clear</button></div>
+        <div class="console" id="safeLog" style="height:140px"></div>
+      </div>
+    </div>
+
     <!-- ================= CALIBRATION ================= -->
     <div class="panel" id="tab-calib">
       <div class="card">
@@ -557,7 +598,6 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
         <div class="row">
           <label class="field" style="width:150px"><span>Update rate (Hz)</span><input type="number" min="5" max="60" data-bind="conn.rate"></label>
           <label class="chk"><input type="checkbox" data-bind="conn.autoReconnect"> Reconnect when the Pico is plugged back in</label>
-          <label class="chk"><input type="checkbox" data-bind="safety.floor"> IK keeps the arm above the table</label>
         </div>
         <p class="small muted" id="connHint"></p>
         <h4>Ports</h4>
@@ -615,7 +655,7 @@ try:
 except ImportError:
     import uasyncio as asyncio
 
-FW = "armctl-usb-1.0"
+FW = "armctl-usb-1.1"
 CFG_FILE = "arm_cfg.json"
 
 # Pins & LED setup from the web page. A config saved from the page (arm_cfg.json) overrides it.
@@ -626,12 +666,11 @@ try:
 except Exception:
     pass
 
-st = {"estop": False, "moved": 0, "seen": 0}
+st = {"estop": False, "moved": 0, "seen": 0, "lost": False}
 led = {"mode": "status", "c1": [0, 120, 255, 0], "c2": [255, 0, 120, 0], "bri": 80, "speed": 50}
 led.update(cfg.get("fx", {}))
 pwms = []
 pins_used = []
-last_us = []
 np = None
 
 
@@ -645,42 +684,90 @@ def save_cfg():
         return False
 
 
-# ---------------- servos ----------------
+# ---------------- servos (with safety limits) ----------------
+# Every pulse is clamped to the servo's min/max (from the page's calibration) and changes at most
+# "slew" microseconds per second, so no command can slam a joint past its range or jerk it.
+cur_us = []    # pulse being output now (None = no pulses yet / released)
+tgt_us = []    # pulse we're moving towards
+
+
+def limit(i, v):
+    s = cfg["servos"][i]
+    return max(s.get("min", 500), min(s.get("max", 2500), v))
+
+
+def out(i):
+    pwms[i].duty_ns(int(cur_us[i] * 1000))
+
+
 def setup_servos():
-    global pwms, pins_used
-    for p in pwms:
-        try:
-            p.deinit()
-        except Exception:
-            pass
-    for n in pins_used:
-        machine.Pin(n, machine.Pin.IN)
-    pwms = []
-    pins_used = []
-    for s in cfg["servos"]:
-        p = machine.PWM(machine.Pin(s["pin"]))
-        p.freq(s.get("freq", 50))
-        p.duty_u16(0)          # no pulses until the page sends a position
-        pwms.append(p)
-        pins_used.append(s["pin"])
-    if last_us and not st["estop"]:
-        set_us(last_us)
+    global pwms, pins_used, cur_us, tgt_us
+    pins = [s["pin"] for s in cfg["servos"]]
+    if pins != pins_used:
+        for p in pwms:
+            try:
+                p.deinit()
+            except Exception:
+                pass
+        for n in pins_used:
+            machine.Pin(n, machine.Pin.IN)
+        pwms = []
+        for n in pins:
+            p = machine.PWM(machine.Pin(n))
+            p.freq(50)
+            p.duty_u16(0)          # no pulses until the page sends a position
+            pwms.append(p)
+        pins_used = pins
+        cur_us = [None] * len(pins)
+        tgt_us = [None] * len(pins)
+    for i in range(len(pwms)):     # new limits apply right away
+        if cur_us[i] is not None:
+            cur_us[i] = limit(i, cur_us[i])
+            tgt_us[i] = limit(i, tgt_us[i])
+            out(i)
 
 
-def set_us(us):
-    global last_us
-    last_us = list(us)
+def set_targets(us):
     for i in range(min(len(us), len(pwms))):
-        v = us[i]
-        if v and 400 <= v <= 2700:
-            pwms[i].duty_ns(int(v * 1000))
-        else:
-            pwms[i].duty_u16(0)
+        if not us[i]:
+            continue
+        tgt_us[i] = limit(i, us[i])
+        if cur_us[i] is None:      # first command after power-up or release: the servo's position is unknown
+            cur_us[i] = tgt_us[i]
+            out(i)
+
+
+def hold():
+    for i in range(len(pwms)):
+        tgt_us[i] = cur_us[i]
 
 
 def release():
-    for p in pwms:
-        p.duty_u16(0)
+    for i in range(len(pwms)):
+        pwms[i].duty_u16(0)
+        cur_us[i] = None
+        tgt_us[i] = None
+
+
+async def servo_task():
+    last = time.ticks_ms()
+    while True:
+        await asyncio.sleep_ms(10)
+        now = time.ticks_ms()
+        dt = time.ticks_diff(now, last) / 1000
+        last = now
+        # watchdog: the page went quiet (USB unplugged, page closed, computer asleep) -> stop where we are
+        if st["seen"] and not st["lost"] and time.ticks_diff(now, st["seen"]) > cfg.get("timeout", 2000):
+            st["lost"] = True
+            hold()
+            print(json.dumps({"t": "log", "msg": "no commands - holding position"}))
+        for i in range(len(pwms)):
+            c, t = cur_us[i], tgt_us[i]
+            if c is None or t is None or c == t:
+                continue
+            step = cfg["servos"][i].get("slew", 2000) * dt
+            cur_us[i] = t if abs(t - c) <= step else c + (step if t > c else -step)
+            out(i)
 
 
 # ---------------- NeoPixels ----------------
@@ -729,6 +816,8 @@ def render_led(t):
         now = time.ticks_ms()
         if st["estop"]:
             c, k = [255, 0, 0, 0], 1.0
+        elif st["lost"]:
+            c, k = [255, 140, 0, 0], 0.1 + 0.9 * (math.sin(t * 0.25) + 1) / 2
         elif time.ticks_diff(now, st["moved"]) < 600:
             c, k = [0, 255, 60, 0], 1.0
         elif st["seen"] and time.ticks_diff(now, st["seen"]) < 4000:
@@ -787,17 +876,30 @@ def handle(line):
     st["seen"] = time.ticks_ms()
     t = m.get("t")
     if t == "pos":
+        st["lost"] = False
+        if not st["estop"]:        # ignored until the page resets the E-STOP
+            set_targets(m.get("us", []))
+            st["moved"] = st["seen"]
+    elif t == "stop":              # E-STOP: freeze in place, or go limp
+        st["estop"] = True
+        if m.get("mode") == "release":
+            release()
+        else:
+            hold()
+    elif t == "resume":
         st["estop"] = False
-        set_us(m.get("us", []))
-        st["moved"] = st["seen"]
+    elif t == "hold":
+        hold()
     elif t == "off":
         release()
-        st["estop"] = bool(m.get("estop", True))
+        st["estop"] = bool(m.get("estop", False))
     elif t == "cfg":
         if "servos" in m:
             cfg["servos"] = m["servos"]
         if "led" in m:
             cfg["led"] = m["led"]
+        if "timeout" in m:
+            cfg["timeout"] = m["timeout"]
         setup_servos()
         setup_led()
         saved = save_cfg() if m.get("save") else False
@@ -837,6 +939,7 @@ async def main():
     setup_servos()
     setup_led()
     asyncio.create_task(led_task())
+    asyncio.create_task(servo_task())
     print(json.dumps({"t": "log", "msg": "ArmCtl ready on USB"}))
     await serial_task()
 
@@ -920,7 +1023,7 @@ const DEFAULT_CFG = {
   conn: { rate: 30, autoReconnect: true, port: '' },   // port: 'VID:PID#n' of the chosen USB port
   view: { grid: true, envelope: true, axes: false, shadows: true, ikMarker: true, trail: false, animPath: true },
   sim: { realistic: true, ghost: false, tolerance: 12, poseTol: 8 },
-  safety: { floor: true },
+  safety: { collide: true, floorMargin: 3, gap: 4, accel: 1500, fwSlew: 450, timeout: 2, estopMode: 'hold' },
   practice: { best: {} },
   poses: [
     { name: 'Home',          q: { base: 0, shoulder: 0, elbow: 0, gripper: 50 } },
@@ -975,6 +1078,7 @@ const state = {
   estop: false,
   overrides: {},          // calibration direct drive: servoId -> servo angle
   keys: new Set(),
+  vel: {},                // joint velocities (°/s) for the acceleration limit
   ik: { x: 0, y: 0, z: 0 },
 };
 
@@ -1036,7 +1140,50 @@ function fk(q) {
   return { pts, tip, dir, pitch: Math.asin(clamp(dir.z, -1, 1)) / D2R };
 }
 const reach = () => FRAME.L1 + Math.hypot(TOOL.x, TOOL.z);
-const belowFloor = f => f.pts[2].z < 0 || f.tip.z < 5;      // the jaws reach ~6 mm below the tool point
+
+/* =====================================================================
+   Safety: collision model
+   Box corners of the moving parts (sizes from the STL files) are checked against the table, the base,
+   the arm base's upright + shoulder servo, and (for the gripper) the upper arm.
+   ===================================================================== */
+const boxPts = (x0, x1, y0, y1, z0, z1) => {
+  const P = []; for (const x of [x0, (x0 + x1) / 2, x1]) for (const y of [y0, y1]) for (const z of [z0, z1]) P.push([x, y, z]); return P;
+};
+const ELBOW_PTS = (() => {                    // in the elbow frame
+  const F = basis(FRAME.forearm), A = m4(F, basis(FRAME.adapter)), G = m4(A, basis(FRAME.gripper));
+  const on = (T, pts, part, gripper = false) => pts.map(p => ({ ...apply(T, p), part, gripper }));
+  return [
+    ...on(F, boxPts(-88, 0, 0, 10, -8, 8), 'forearm'),
+    ...on(F, boxPts(-80, -56, 2, 25, -6.1, 6.5), 'elbow servo'),
+    ...on(A, boxPts(-31.7, 0, 0, 16, -5.8, 24.1), 'gripper'),
+    ...on(G, boxPts(-28, 16.5, 0, 21, -33, 41.5), 'gripper', true),   // incl. the open jaw, gear and servo
+  ];
+})();
+const UPPER_PTS = boxPts(-10.5, 10.5, -21.85, -16.25, -10.5, FRAME.L1 + 10.5);   // upper arm, shoulder frame
+const BASE_R = 36, BASE_TOP = FRAME.turntable + 3;                                // base + turntable
+const UPRIGHT = { x: [-18, 22], y: [-14, 22], z: [FRAME.turntable, FRAME.turntable + 41] };   // upright + shoulder servo, turret frame
+// How far (mm) the arm would be inside something at pose q, and what it hits. Base rotation doesn't matter: work in the turret frame.
+function collision(q) {
+  const S = cfg.safety, gap = +S.gap || 0, floor = +S.floorMargin || 0;
+  const Ts = m4(tr(FRAME.shoulder[0], 0, SHOULDER_Z), ry(q.shoulder * D2R));
+  const Tse = m4(tz(FRAME.L1), ry((90 - q.elbow) * D2R)), Te = m4(Ts, Tse);
+  let pen = 0, what = '';
+  const hit = (d, w) => { if (d > pen) { pen = d; what = w; } };
+  for (const p of UPPER_PTS) hit(floor - apply(Ts, p).z, 'the upper arm would hit the table');
+  for (const p of ELBOW_PTS) {
+    const w = apply(Te, [p.x, p.y, p.z]);
+    hit(floor - w.z, `the ${p.part} would hit the table`);
+    const r = Math.hypot(w.x, w.y);
+    if (r < BASE_R + gap && w.z < BASE_TOP + gap) hit(Math.min(BASE_R + gap - r, BASE_TOP + gap - w.z), `the ${p.part} would hit the base`);
+    if (!p.gripper) continue;
+    const U = UPRIGHT, inside = [[w.x, U.x], [w.y, U.y], [w.z, U.z]].map(([v, [a, b]]) => Math.min(v - a + gap, b + gap - v));
+    if (inside.every(d => d > 0)) hit(Math.min(...inside), 'the gripper would hit the shoulder');
+    const u = apply(Tse, [p.x, p.y, p.z]);                         // gripper point in the shoulder frame
+    if (u.z > -10 && u.z < FRAME.L1 + 10 && Math.abs(u.x) < 10.5 + gap) hit(10.5 + gap - Math.abs(u.x), 'the gripper would hit the upper arm');
+  }
+  return { pen, what };
+}
+const collides = q => cfg.safety.collide && collision(q).pen > 0;
 
 function solveLinear(A, b) {           // tiny Gaussian elimination, n <= 4
   const n = b.length, M = A.map((r, i) => [...r, b[i]]);
@@ -1082,11 +1229,11 @@ function solveIK(tgt, start, quick = false) {
       r = err(q);
     }
     const pe = Math.hypot(...r.e);
-    const floor = cfg.safety.floor && belowFloor(r.f);
+    const floor = collides(q);
     const ok = pe < 1.5 && !floor;
     const move = IK_J.reduce((s, k) => s + Math.abs(q[k] - start[k]), 0);
     const cost = pe + (floor ? 1000 : 0) + move * 0.02;
-    if (!best || (ok && !best.ok) || (ok === best.ok && cost < best.cost)) best = { q, pe, ok, floor, cost };
+    if (!best || (ok && !best.ok) || (ok === best.ok && cost < best.cost)) best = { q, pe, ok, floor, cost, what: floor ? collision(q).what : '' };
     if (si === 0 && ok) break;                                  // the current pose converged: smoothest result
   }
   return best;
@@ -1167,6 +1314,8 @@ const link = {
     }
     this.writer = null; updateConn(); updateWarnings(); renderPorts();
     if (was) log(byUser ? 'Disconnected' : 'USB connection lost', byUser ? '' : 'er');
+    if (was && !byUser && live()) { stopAnim(); safetyEvent('USB connection lost — the Pico holds the arm still', true); }
+    renderSafety();
   },
   raw(text) { if (this.writer) this.writer.write(new TextEncoder().encode(text)).catch(() => {}); },
   send(obj) {
@@ -1183,7 +1332,10 @@ const link = {
       return;
     }
     if (m.t === 'pong') { this.lastPong = performance.now(); this.rtt = Math.round(performance.now() - (m.id || 0)); this.silentWarned = false; updateConn(); return; }
-    if (m.t === 'hello') { this.fw = m.fw || ''; }
+    if (m.t === 'hello') {
+      this.fw = m.fw || ''; renderSafety();
+      if (this.fw < FW_SAFE) safetyEvent('The Pico runs an old main.py without the Pico-side limits — download main.py again (Settings) and copy it to the Pico.', true);
+    }
     log('← ' + line, 'rx');
   },
 };
@@ -1255,7 +1407,12 @@ function cfgPacket(save) {
   const L = cfg.led;
   return {
     t: 'cfg', save: !!save,
-    servos: SERVOS.map(s => ({ id: s.id, pin: +cfg.servos[s.id].pin, freq: 50 })),
+    // Pico-side safety: pulse range from the calibrated min/max angle, speed limit in µs per second
+    servos: SERVOS.map(s => {
+      const c = cfg.servos[s.id], a = [angleToUs(s.id, +c.minAngle), angleToUs(s.id, +c.maxAngle)];
+      return { id: s.id, pin: +c.pin, freq: 50, min: Math.min(...a), max: Math.max(...a), slew: Math.round(+cfg.safety.fwSlew * Math.abs(c.maxUs - c.minUs) / c.range) };
+    }),
+    timeout: Math.round(+cfg.safety.timeout * 1000),
     led: { pin: +L.pin, count: L.enabled ? +L.count : 0, bpp: +L.bpp, timing: +L.khz === 800 ? 1 : 0, order: L.order, type: L.type },
   };
 }
@@ -1359,7 +1516,7 @@ const IK_FIELDS = { x: 'ikX', y: 'ikY', z: 'ikZ' };
 function ikRanges() {
   const R = Math.ceil(reach()), H = SHOULDER_Z;
   const set = (id, a, b) => { for (const el of [$('#' + id), $('#' + id + 'r')]) { el.min = a; el.max = b; } };
-  set('ikX', -R, R); set('ikY', -R, R); set('ikZ', cfg.safety.floor ? 0 : -60, Math.ceil(H + R));
+  set('ikX', -R, R); set('ikY', -R, R); set('ikZ', cfg.safety.collide ? 0 : -60, Math.ceil(H + R));
 }
 function writeIkFields() {
   for (const [k, id] of Object.entries(IK_FIELDS)) {
@@ -1390,7 +1547,7 @@ function ikGo(quick = false) {
     updateIkMarker();
     return true;
   }
-  ikStatus(r.floor ? 'Not reachable without hitting the table.' : `Out of reach (closest ${r.pe.toFixed(0)} mm away).`, 'err');
+  ikStatus(r.floor ? `Blocked by the safety system: ${r.what}.` : `Out of reach (closest ${r.pe.toFixed(0)} mm away).`, 'err');
   updateIkMarker();
   return false;
 }
@@ -1467,15 +1624,16 @@ function animPose(a, t) {
 }
 // Sampled curves, tool path and per-segment checks (servo speed, straight-line reachability). Rebuilt when keys change.
 function animInfo() {
-  const a = curAnim(), sig = JSON.stringify(a.keys) + cfg.typeSpeed.MG90S + JSON.stringify(cfg.joints) + cfg.safety.floor;
+  const a = curAnim(), sig = JSON.stringify(a.keys) + cfg.typeSpeed.MG90S + JSON.stringify(cfg.joints) + JSON.stringify(cfg.safety);
   if (anim.cache && anim.cache.sig === sig) return anim.cache;
-  const K = a.keys, samples = [], seg = K.map(() => ({ speed: 0, err: 0 })), dur = animDur(a), dt = 0.04;
+  const K = a.keys, samples = [], seg = K.map(() => ({ speed: 0, err: 0, hit: '' })), dur = animDur(a), dt = 0.04;
   let prev = null;
   for (let i = 0, n = Math.ceil(dur / dt); i <= n && K.length; i++) {
     const t = Math.min(dur, i * dt), r = animPose(a, t), si = Math.max(1, K.findIndex(k => k.t >= t - 1e-9));
     samples.push({ t, q: r.q, tip: fk(r.q).tip });
     if (K.length > 1) {
       seg[si].err = Math.max(seg[si].err, r.err);
+      if (!seg[si].hit && collides(r.q)) seg[si].hit = collision(r.q).what.replace(/^the (.*) would hit/, '$1 hits');
       if (prev && t > prev.t) for (const j of JOINTS)
         seg[si].speed = Math.max(seg[si].speed, Math.abs(r.q[j.id] - prev.q[j.id]) / (t - prev.t) / servoSpeed(j.id));
     }
@@ -1483,7 +1641,7 @@ function animInfo() {
   }
   return (anim.cache = { sig, samples, seg, dur });
 }
-const segProblem = (s, speed = 1) => s.err > 2 ? 'path out of reach' : s.speed * speed > 1.05 ? `too fast ×${(s.speed * speed).toFixed(1)}` : '';
+const segProblem = (s, speed = 1) => s.hit || (s.err > 2 ? 'path out of reach' : s.speed * speed > 1.05 ? `too fast ×${(s.speed * speed).toFixed(1)}` : '');
 function animChanged() {
   const a = curAnim();
   a.keys.sort((x, y) => x.t - y.t);
@@ -1506,6 +1664,10 @@ function playAnim() {
   const a = curAnim();
   if (a.keys.length < 2) { toast('Add at least two keyframes first'); return; }
   if (state.estop) { toast('Release the E-stop first'); return; }
+  if (live() && animInfo().seg.some((sg, i) => i && segProblem(sg))) {
+    animStatus('Safety: fix the red parts of the timeline before playing on the real arm (you can still play it in the Simulator).', 'err');
+    safetyEvent(`Blocked live playback of “${a.name}”: it has red segments`); return;
+  }
   stopRec(); prac.stop(false);
   if (anim.t >= animDur(a) - 1e-6) anim.t = 0;
   anim.playing = true; anim.phase = 'approach';
@@ -1713,10 +1875,13 @@ function setEstop(on) {
   if (on) {
     stopAnim(); stopRec(); prac.stop(false);
     state.target = { ...state.current }; refreshJointUI(); syncIkFromTarget();
-    link.send({ t: 'off', estop: true });
-    toast('E-STOP — servos released');
+    for (const j of JOINTS) state.vel[j.id] = 0;
+    link.send({ t: 'stop', mode: cfg.safety.estopMode });
+    toast(cfg.safety.estopMode === 'release' ? 'E-STOP — servos released' : 'E-STOP — arm frozen in place');
+    safetyEvent('E-STOP pressed (' + (cfg.safety.estopMode === 'release' ? 'servos released' : 'frozen') + ')');
   } else {
     state.target = { ...state.current }; link.lastSent = '';
+    link.send({ t: 'resume' });
     toast('E-stop reset');
   }
   updateWarnings();
@@ -1726,7 +1891,7 @@ function setMode(m) {
   if (m === 'live' && !confirm('Switch to LIVE mode? The real arm will move to the pose shown in the preview.')) { renderMode(); return; }
   if (m === 'live' && prac.active) prac.stop(false);
   cfg.mode = m; saveCfg(); link.lastSent = ''; state.overrides = {};
-  if (m === 'sim') link.send({ t: 'off', estop: false });
+  if (m === 'sim') link.send({ t: 'hold' });               // keep the real arm where it is
   renderMode();
   toast(m === 'live' ? 'LIVE mode — commands go to the arm' : 'Simulator mode — the arm is not driven');
 }
@@ -1735,6 +1900,56 @@ function renderMode() {
   const b = $('#modeBadge'); b.className = 'badge ' + cfg.mode; b.textContent = cfg.mode === 'live' ? 'LIVE' : 'SIMULATOR';
   $('#simTag').textContent = cfg.mode === 'live' ? 'currently LIVE' : 'active'; $('#simTag').className = 'tag ' + (cfg.mode === 'live' ? 'err' : 'ok');
   $('#simEnter').style.display = cfg.mode === 'live' ? '' : 'none';
+}
+
+/* =====================================================================
+   Safety system
+   ===================================================================== */
+const FW_SAFE = 'armctl-usb-1.1';            // first main.py with the Pico-side limits
+// Stops a move that would hit something. Moving out of (or not deeper into) a collision is allowed.
+function guardMotion(prev) {
+  if (!cfg.safety.collide) return;
+  const now = collision(state.current);
+  if (now.pen <= 0 || now.pen <= collision(prev).pen + 0.01) return;
+  state.current = prev; state.target = { ...prev };
+  for (const j of JOINTS) state.vel[j.id] = 0;
+  stopAnim(); state.keys.clear();
+  refreshJointUI(); syncIkFromTarget();
+  safetyEvent('Stopped: ' + now.what, true);
+}
+let lastSafeMsg = '', lastSafeT = 0;
+function safetyEvent(msg, warn = false) {
+  const t = performance.now();
+  if (msg === lastSafeMsg && t - lastSafeT < 1500) return;
+  lastSafeMsg = msg; lastSafeT = t;
+  const c = $('#safeLog'), line = document.createElement('div');
+  line.className = warn ? 'er' : ''; line.textContent = `${new Date().toLocaleTimeString()}  ${msg}`;
+  c.appendChild(line); while (c.childElementCount > 200) c.firstChild.remove(); c.scrollTop = c.scrollHeight;
+  if (warn) toast('🛡 ' + msg);
+  log('Safety: ' + msg, warn ? 'er' : '');
+}
+let cfgSendT = 0;
+function sendCfgSoon() { clearTimeout(cfgSendT); cfgSendT = setTimeout(() => { if (link.connected) link.send(cfgPacket(false)); }, 600); }
+const fwHasSafety = () => link.connected && link.fw >= FW_SAFE;
+function renderSafety() {
+  const S = cfg.safety, J = cfg.joints, on = (b, a = 'On', o = 'Off') => `<span class="tag ${b ? 'ok' : 'err'}">${b ? a : o}</span>`;
+  const fw = !link.connected ? '<span class="tag">Not connected</span>' : fwHasSafety() ? on(true, 'Active on Pico') : '<span class="tag err">Old main.py</span>';
+  const rows = [
+    ['Joint limits', JOINTS.map(j => `${j.name} ${J[j.id].min}…${J[j.id].max}${j.unit}`).join(' · '), on(true)],
+    ['Collision guard', `Table (${S.floorMargin} mm clearance), base, shoulder and upper arm`, on(S.collide)],
+    ['Speed & acceleration', `≤ ${cfg.typeSpeed.MG90S} °/s, ${S.accel} °/s² ramps`, on(true)],
+    ['Animation check', 'Red segments (too fast, unreachable, collision) can\'t play on the real arm', on(true)],
+    ['E-STOP (Esc)', S.estopMode === 'release' ? 'Releases the servos' : 'Freezes the arm in place', on(true)],
+    ['Pico pulse limits', 'Each servo clamped to its calibrated Min/Max angle', fw],
+    ['Pico speed limit', `≤ ${S.fwSlew} °/s even if the page sends a jump`, fw],
+    ['Lost connection', `Pico holds position after ${S.timeout} s without commands`, fw],
+  ];
+  $('#safeTable').innerHTML = '<tr><th>Protection</th><th>What it does</th><th>Status</th></tr>' + rows.map(r => `<tr><td><b>${r[0]}</b></td><td class="small">${r[1]}</td><td>${r[2]}</td></tr>`).join('');
+  const st = $('#safeState'), off = !S.collide;
+  st.textContent = off ? 'collision guard off' : 'protected'; st.className = 'tag ' + (off ? 'err' : 'ok');
+  const ft = $('#fwSafeTag');
+  ft.textContent = !link.connected ? 'Not connected' : fwHasSafety() ? 'Active on Pico' : 'Old main.py — update it';
+  ft.className = 'tag' + (fwHasSafety() ? ' ok' : link.connected ? ' err' : '');
 }
 
 /* =====================================================================
@@ -1756,7 +1971,7 @@ const prac = {
       for (const j of JOINTS) { const L = cfg.joints[j.id]; const span = (L.max - L.min) * 0.8; q[j.id] = round(L.min + (L.max - L.min) * 0.1 + Math.random() * span); }
       q.gripper = Math.random() < 0.5 ? 0 : 100;
       const f = fk(q);
-      if (f.pts.slice(2).every(p => p.z > 15) && Math.hypot(f.tip.x, f.tip.y) > 70) return q;
+      if (f.tip.z > 15 && collision(q).pen <= 0 && Math.hypot(f.tip.x, f.tip.y) > 70) return q;
     }
     return homePose();
   },
@@ -1838,7 +2053,8 @@ function buildCalibration() {
     const rr = $('[data-rawrng]', d);
     const drive = a => {
       const s = cfg.servos[sv.id];
-      state.overrides[sv.id] = clamp(a, 0, s.range); rr.max = s.range; rr.value = state.overrides[sv.id];
+      state.overrides[sv.id] = clamp(a, Math.min(s.minAngle, s.maxAngle), Math.max(s.minAngle, s.maxAngle));   // never past Min/Max angle
+      rr.max = s.range; rr.value = state.overrides[sv.id];
       if (!live() && !drive.warned) { drive.warned = true; toast('Direct drive only moves the real servo in Live mode'); }
       refreshCalInfo();
     };
@@ -2065,7 +2281,8 @@ function onBind(p, el) {
   }
   if (p.startsWith('view.')) { applyView(); updateAnimPath(); }
   if (p.startsWith('sim.')) { if (p === 'sim.tolerance') updateTargets(); }
-  if (p === 'safety.floor') ikRanges();
+  if (p.startsWith('safety.')) { ikRanges(); renderAnimUI(); renderSafety(); sendCfgSoon(); }
+  if (p.startsWith('servos.') || p === 'typeSpeed.MG90S') sendCfgSoon();
   if (p.startsWith('conn.')) updateConn();
 }
 function connHint() {
@@ -2336,7 +2553,7 @@ function render3D(now) {
     }
   }
   // tint the arm red when it would hit the table
-  const hit = belowFloor(fk(state.current));
+  const hit = collides(state.current);
   view.mats.accent.emissive.setHex(hit ? 0x661111 : 0x000000);
   view.controls.update();
   view.renderer.render(view.scene, view.camera);
@@ -2387,7 +2604,8 @@ function updateReadout(now) {
 function updateWarnings() {
   const w = [];
   if (state.estop) w.push('E-STOP active — servos released');
-  if (belowFloor(fk(state.current))) w.push('Arm is below the table surface!');
+  const col = cfg.safety.collide ? collision(state.current) : { pen: 0 };
+  if (col.pen > 0) w.push('Collision: ' + col.what.replace('would hit', 'hits'));
   if (live() && !link.connected) w.push('Live mode: not connected');
   if (Object.keys(state.overrides).length && live()) w.push('Direct drive active (calibration)');
   const b = $('#warnBox'); b.style.display = w.length ? 'block' : 'none'; b.innerHTML = w.map(esc).join('<br>');
@@ -2414,12 +2632,20 @@ function tick(now) {
   }
   // move "current" towards "target" at the servos' speed
   if (!state.estop) {
-    const instant = !live() && !cfg.sim.realistic;
+    const instant = !live() && !cfg.sim.realistic, prev = { ...state.current };
     for (const j of JOINTS) {
-      const t = state.target[j.id], c = state.current[j.id];
-      if (instant) state.current[j.id] = t;
-      else { const m = (anim.playing ? servoSpeed(j.id) : jointSpeed(j.id)) * dt; state.current[j.id] = c + clamp(t - c, -m, m); }
+      const id = j.id, t = state.target[id], c = state.current[id];
+      if (instant) { state.current[id] = t; state.vel[id] = 0; continue; }
+      const vmax = anim.playing ? servoSpeed(id) : jointSpeed(id);
+      const acc = Math.max(1, +cfg.safety.accel || 1e6) * servoSpeed(id) / servoSpeed('base');
+      let v = state.vel[id] || 0; const d = t - c;
+      if (Math.abs(d) < 0.02 && Math.abs(v) <= acc * dt) { state.current[id] = t; state.vel[id] = 0; continue; }
+      v += clamp(Math.sign(d) * Math.min(vmax, Math.sqrt(2 * acc * Math.abs(d))) - v, -acc * dt, acc * dt);   // ramp up/down
+      let nc = c + v * dt;
+      if ((t - nc) * d < 0) { nc = t; v = 0; }                       // don't overshoot
+      state.current[id] = nc; state.vel[id] = v;
     }
+    guardMotion(prev);
   }
   stepAnim(dt);
   stepRec(now);
@@ -2442,7 +2668,7 @@ function download(name, text, type = 'text/plain') {
 }
 function firmware() {
   const pk = cfgPacket(false), lp = ledPacket(false);
-  const fwCfg = { servos: pk.servos, led: pk.led, fx: lp.fx };
+  const fwCfg = { servos: pk.servos, led: pk.led, fx: lp.fx, timeout: pk.timeout };
   if (pinProblems().msgs.length) { toast('Fix the pin conflicts first'); return null; }
   return $('#fwTemplate').textContent.replace(/^\n/, '')
     .replace('{{CFG}}', () => JSON.stringify(fwCfg).replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
@@ -2482,6 +2708,7 @@ function setupEvents() {
   });
   $('#poseName').addEventListener('keydown', e => { if (e.key === 'Enter') $('#poseSave').click(); });
   setupAnimEvents();
+  $('#safeClear').addEventListener('click', () => $('#safeLog').innerHTML = '');
   // simulator
   $('#simEnter').addEventListener('click', () => setMode('sim'));
   $('#pracReach').addEventListener('click', () => prac.active && prac.kind === 'reach' ? prac.stop(false) : prac.begin('reach'));
@@ -2569,7 +2796,7 @@ function boot() {
   $('#speedVal').textContent = cfg.speed + ' %';
   applyTheme();
   renderMode();
-  renderPoses(); renderAnimUI(); renderPrac();
+  renderPoses(); renderAnimUI(); renderPrac(); renderSafety();
   updateConn(); connHint(); refreshPorts();
   syncIkFromTarget();
   init3D().then(() => { applyView(); updateAnimPath(); });

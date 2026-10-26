@@ -30,6 +30,16 @@ Pins and limits can be changed in the page.
 - **Simulator mode**: everything (joints, IK, animations) runs on the 3D model with realistic MG90S speeds, and nothing is sent to the arm. Includes practice exercises. Switch to **Live** to drive the real arm.
 - **3D view of the printed frame**: the STL parts are built into the page and move like the real arm, including the gripper rack and gear. There's a 2D fallback when offline.
 - **USB connection** (Web Serial): choose which port the commands go to from the dropdown next to **Connect USB** (or in Settings → Ports). Pick **Choose another port…** to open the browser's picker, which shows the COM / tty names. The choice is remembered, and the page reconnects when that port is plugged back in.
+- **Safety system** (Safety tab), so the arm doesn't break:
+  - **Collision guard**: every move (sliders, keys, IK, poses, animations) is checked first. A move that would hit the table, the base, the shoulder or the upper arm is stopped.
+  - **Joint limits** and calibrated servo **min/max angles** are never exceeded.
+  - **Smooth motion**: speed and acceleration limits.
+  - **Animation check**: animations with red segments (too fast, unreachable, collision) can't play on the real arm.
+  - **On the Pico** (`main.py`):
+    - Every pulse is clamped to the servo's range.
+    - A speed limit applies even if the page sends a jump.
+    - The Pico holds position if commands stop (USB unplugged, page closed).
+    - **E-STOP** freezes the arm in place (or optionally releases the servos).
 - **Calibration** of servo centres, directions, limits and home pose. **Pin assignments** with a pinout diagram. **NeoPixel** LED control.
 - **E-STOP** button (or press `Esc`). Light and dark themes. Works on phones (simulator only: phones have no Web Serial).
 
