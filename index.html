@@ -122,7 +122,7 @@ main { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(380px, 1fr
 .panel { display: none; flex-direction: column; gap: 12px; }
 .panel.on { display: flex; }
 .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; box-shadow: var(--shadow); min-width: 0; }
-.card > .head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.card > .head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
 .card > .head h3 { margin-right: auto; }
 @media (max-width: 1020px) {
   main { grid-template-columns: 1fr; padding: 10px; }
@@ -173,6 +173,18 @@ main { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(380px, 1fr
 .item.playing { border-color: var(--accent); background: var(--accent-weak); }
 .empty { color: var(--muted); font-size: 12px; text-align: center; padding: 8px; }
 
+/* ---------- animation ---------- */
+.timeline { display: block; width: 100%; height: 150px; margin: 10px 0 6px; border-radius: 8px; background: var(--panel2); border: 1px solid var(--border); touch-action: none; cursor: col-resize; }
+.legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+.legend i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 4px; }
+.list.keys { max-height: 340px; }
+.item.key { flex-wrap: wrap; cursor: pointer; }
+.item.key.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.item.key input[type=number] { width: 66px; padding: 3px 6px; }
+.item.key select { padding: 3px 4px; font-size: 12px; }
+.item.key .q { flex: 1; min-width: 150px; font-family: var(--mono); font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.btn.rec.on { background: var(--danger); border-color: var(--danger); color: #fff; animation: blink 1s infinite; }
+
 /* ---------- tables / calibration / pins ---------- */
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th, td { text-align: left; padding: 6px 6px; border-bottom: 1px solid var(--border); vertical-align: middle; }
@@ -221,7 +233,7 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
     <button data-mode="live">Live</button>
   </div>
   <span class="pill" id="connPill"><span class="dot" id="connDot"></span><span id="connText">Disconnected</span></span>
-  <button class="btn" id="connBtn">Connect</button>
+  <button class="btn" id="connBtn" title="Connect to the Pico over USB">Connect USB</button>
   <button class="btn icon" id="themeBtn" title="Theme: auto / light / dark"></button>
   <button class="estop" id="estopBtn" title="Emergency stop (Esc)">E-STOP</button>
 </header>
@@ -242,13 +254,14 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
       <button class="btn sm" data-cam="top">Top</button>
     </div>
     <div class="ov bl">
-      <div class="glass small muted" id="viewHint">Drag to orbit · scroll to zoom · right-drag to pan · <b>Shift+click</b> floor to set IK target</div>
+      <div class="glass small muted" id="viewHint"><b>Drag the blue ball</b> to move the gripper (IK) · drag elsewhere to orbit · scroll to zoom · right-drag to pan</div>
     </div>
   </section>
 
   <section class="side">
     <nav class="tabs" id="tabs">
       <button data-tab="control" class="on">Control</button>
+      <button data-tab="anim">Animate</button>
       <button data-tab="sim">Simulator</button>
       <button data-tab="calib">Calibration</button>
       <button data-tab="pins">Pin assignments</button>
@@ -264,7 +277,7 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
           <button class="btn sm" id="gripOpen">Open</button>
           <button class="btn sm" id="gripClose">Close</button>
         </div>
-        <div id="jointRows"></div>
+        <div class="jointRows"></div>
         <div class="row" style="margin-top:10px">
           <span class="small muted" style="width:52px">Speed</span>
           <input type="range" min="5" max="100" step="1" data-bind="speed" class="grow">
@@ -301,31 +314,77 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
       </div>
 
       <div class="card">
-        <div class="head"><h3>Poses &amp; sequences</h3></div>
+        <div class="head"><h3>Saved poses</h3></div>
         <div class="row" style="margin-bottom:8px">
           <input type="text" id="poseName" placeholder="Pose name" class="grow">
           <button class="btn sm primary" id="poseSave">Save current pose</button>
         </div>
         <div class="list" id="poseList"></div>
-        <h4>Sequence</h4>
-        <div class="list" id="seqList"></div>
-        <div class="row" style="margin-top:8px">
-          <button class="btn sm primary" id="seqPlay">▶ Play</button>
-          <button class="btn sm" id="seqStop">■ Stop</button>
-          <label class="chk small"><input type="checkbox" data-bind="seqLoop"> Loop</label>
-          <span class="grow"></span>
-          <span class="small muted">Dwell</span>
-          <input type="number" min="0" step="100" data-bind="seqDwell" style="width:74px"><span class="small muted">ms</span>
-          <button class="btn sm ghost" id="seqClear">Clear</button>
-        </div>
+        <p class="small muted">“+ Key” adds the pose as a keyframe at the end of the animation selected on the <b>Animate</b> tab.</p>
       </div>
 
       <div class="card small">
         <div class="head"><h3>Keyboard</h3></div>
         <div class="grid2">
           <div><kbd>Q</kbd>/<kbd>A</kbd> base · <kbd>W</kbd>/<kbd>S</kbd> shoulder<br><kbd>E</kbd>/<kbd>D</kbd> elbow · <kbd>R</kbd>/<kbd>F</kbd> gripper</div>
-          <div><kbd>←</kbd><kbd>→</kbd> IK Y · <kbd>↑</kbd><kbd>↓</kbd> IK X<br><kbd>PgUp</kbd>/<kbd>PgDn</kbd> IK Z<br><kbd>Home</kbd> home pose · <kbd>Esc</kbd> E-stop</div>
+          <div><kbd>←</kbd><kbd>→</kbd> IK Y · <kbd>↑</kbd><kbd>↓</kbd> IK X · <kbd>PgUp</kbd>/<kbd>PgDn</kbd> IK Z<br><kbd>Space</kbd> play/pause animation · <kbd>K</kbd> add keyframe<br><kbd>Home</kbd> home pose · <kbd>Esc</kbd> E-stop</div>
         </div>
+      </div>
+    </div>
+
+    <!-- ================= ANIMATE ================= -->
+    <div class="panel" id="tab-anim">
+      <div class="card">
+        <div class="head"><h3>Animation</h3><span class="tag" id="animInfo"></span></div>
+        <div class="row">
+          <select id="animSel" class="grow" aria-label="Animation"></select>
+          <button class="btn sm" id="animNew">New</button>
+          <button class="btn sm" id="animDup">Duplicate</button>
+          <button class="btn sm" id="animRename">Rename</button>
+          <button class="btn sm ghost" id="animDel">Delete</button>
+        </div>
+        <canvas class="timeline" id="timeline" aria-label="Timeline: drag to scrub, drag a diamond to retime its keyframe"></canvas>
+        <div class="legend" id="legend"></div>
+        <div class="row">
+          <button class="btn primary" id="animPlay" style="min-width:92px">▶ Play</button>
+          <button class="btn" id="animStop" title="Stop and rewind">■ Stop</button>
+          <button class="btn rec" id="animRec" title="Record keyframes while you move the arm">● Record</button>
+          <span class="mono small" id="animTime"></span>
+          <span class="grow"></span>
+          <label class="chk small"><input type="checkbox" id="animLoop"> Loop</label>
+          <select id="animSpeed" aria-label="Playback speed"><option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option><option value="2">2×</option></select>
+        </div>
+        <div class="status" id="animStatus" style="margin-top:10px"></div>
+      </div>
+
+      <div class="card">
+        <div class="head"><h3>Keyframes</h3>
+          <span class="small muted">gap</span><input type="number" min="0.1" max="30" step="0.1" data-bind="animGap" style="width:62px"><span class="small muted">s</span>
+          <button class="btn sm" id="keyInsert" title="Insert the arm's pose at the playhead">Insert at playhead</button>
+          <button class="btn sm primary" id="keyAdd" title="Add the arm's pose at the end (K)">+ Keyframe</button>
+        </div>
+        <div class="list keys" id="keyList"></div>
+      </div>
+
+      <div class="card">
+        <div class="head"><h3>Pose the arm</h3><span class="small muted">or drag the blue ball in the 3D view</span></div>
+        <div class="jointRows"></div>
+      </div>
+
+      <div class="card small">
+        <div class="head"><h3>How it works</h3>
+          <button class="btn sm" id="animExport">Export</button><button class="btn sm" id="animImport">Import</button>
+          <input type="file" id="animFile" accept="application/json,.json" hidden>
+        </div>
+        <ol style="margin:0;padding-left:18px">
+          <li>Pose the arm with the sliders, the keyboard, or by dragging the blue ball in the 3D view (IK), then press <b>+ Keyframe</b>. Repeat.</li>
+          <li><b>Joint</b> moves turn every joint at once. <b>Straight</b> moves the gripper along a straight line using inverse kinematics, for approaching and lifting objects.</li>
+          <li><b>Smooth</b> eases in and out of a keyframe; <b>Linear</b> keeps a constant speed.</li>
+          <li><b>● Record</b> turns your live movements into keyframes.</li>
+          <li>Red parts of the timeline are faster than an MG90S can turn (or a straight line the arm can't follow): give them more time.</li>
+          <li>In <b>Simulator</b> mode only the 3D arm moves. In <b>Live</b> mode, Play first moves the real arm to the first keyframe, then streams the animation over USB.</li>
+        </ol>
+        <div class="row" style="margin-top:10px"><label class="chk"><input type="checkbox" data-bind="view.animPath"> Show the gripper's path in the 3D view</label></div>
       </div>
     </div>
 
@@ -333,7 +392,7 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
     <div class="panel" id="tab-sim">
       <div class="card">
         <div class="head"><h3>Simulator mode</h3><span class="tag" id="simTag"></span></div>
-        <p class="muted">In simulator mode nothing is sent to the Pico — the 3D arm moves with realistic servo speeds so you can practise safely. Every control (joints, IK, poses, keyboard) works the same as in live mode.</p>
+        <p class="muted">In simulator mode nothing is sent to the Pico — the 3D arm moves with realistic MG90S speeds so you can practise and test animations safely. Every control (joints, IK, poses, animations, keyboard) works the same as in live mode.</p>
         <div class="row" style="margin-top:8px">
           <button class="btn blue" id="simEnter">Switch to simulator</button>
           <label class="chk"><input type="checkbox" data-bind="sim.realistic"> Realistic servo speed</label>
@@ -426,7 +485,7 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
       <div class="card small">
         <div class="head"><h3>Wiring notes</h3></div>
         <ul style="margin:0;padding-left:18px">
-          <li>Power the four MG90S from a separate 5 V supply (≥ 3 A; each can draw ~0.7 A when stalled). Never from the Pico's 3V3 pin.</li>
+          <li>Power the four MG90S from a separate 5 V supply (≥ 3 A; each can draw ~0.7 A when stalled). Never from the Pico's 3V3 pin, and not from USB.</li>
           <li>Connect the servo supply ground to a Pico <b>GND</b> pin — the signal needs a common ground.</li>
           <li>GP23, GP24, GP25 and GP29 are used by the Pico W's wireless chip and can't be assigned.</li>
           <li>GPn and GPn+16 share one PWM output (e.g. GP0 &amp; GP16), so two servos can't use both.</li>
@@ -492,36 +551,24 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
         </div>
       </div>
       <div class="card">
-        <div class="head"><h3>Connection</h3></div>
-        <div class="grid3">
-          <label class="field"><span>Transport</span><select data-bind="conn.transport"><option value="ws">Wi-Fi (WebSocket)</option><option value="serial">USB (Web Serial)</option></select></label>
-          <label class="field"><span>Pico IP / hostname</span><input type="text" data-bind="conn.host" placeholder="192.168.4.1"></label>
-          <label class="field"><span>Port</span><input type="number" min="1" max="65535" data-bind="conn.port"></label>
-          <label class="field"><span>WebSocket path</span><input type="text" data-bind="conn.path"></label>
-          <label class="field"><span>Serial baud</span><input type="number" data-bind="conn.baud"></label>
-          <label class="field"><span>Update rate (Hz)</span><input type="number" min="5" max="60" data-bind="conn.rate"></label>
-        </div>
-        <div class="row" style="margin-top:10px">
-          <label class="chk"><input type="checkbox" data-bind="conn.autoReconnect"> Auto-reconnect</label>
+        <div class="head"><h3>USB connection</h3><span class="tag" id="serialSupport"></span></div>
+        <div class="row">
+          <label class="field" style="width:150px"><span>Update rate (Hz)</span><input type="number" min="5" max="60" data-bind="conn.rate"></label>
+          <label class="chk"><input type="checkbox" data-bind="conn.autoReconnect"> Reconnect when the Pico is plugged back in</label>
           <label class="chk"><input type="checkbox" data-bind="safety.floor"> IK keeps the arm above the table</label>
         </div>
         <p class="small muted" id="connHint"></p>
       </div>
       <div class="card">
-        <div class="head"><h3>Pico W firmware (MicroPython)</h3></div>
-        <p class="small muted">Generates a <code>main.py</code> that speaks this page's protocol, using your current pins and LED settings. Copy it and this <code>index.html</code> onto the Pico W (e.g. with Thonny); the Pico will then serve this page at <code>http://&lt;pico-ip&gt;/</code>.</p>
-        <div class="grid2">
-          <label class="field"><span>Wi-Fi name (SSID)</span><input type="text" id="fwSsid" autocomplete="off"></label>
-          <label class="field"><span>Wi-Fi password</span><input type="password" id="fwPass" autocomplete="new-password"></label>
-          <label class="field"><span>Access-point name (fallback)</span><input type="text" id="fwApSsid" value="ArmCtl-Pico"></label>
-          <label class="field"><span>Access-point password (≥ 8 chars)</span><input type="text" id="fwApPass" value="robotarm"></label>
-        </div>
-        <div class="row" style="margin-top:10px">
-          <label class="chk small"><input type="checkbox" id="fwAp"> Always start as access point (no home Wi-Fi)</label>
-          <span class="grow"></span>
-          <button class="btn sm primary" id="fwDownload">Download main.py</button>
-        </div>
-        <p class="small muted">Wi-Fi credentials are only written into the downloaded file; they are not stored by this page. In access-point mode the Pico is at <code>192.168.4.1</code>. The 3D view loads three.js from the internet; without internet the page falls back to a 2D schematic view.</p>
+        <div class="head"><h3>Pico firmware (MicroPython)</h3></div>
+        <p class="small muted">Generates a <code>main.py</code> that talks to this page over USB, using your current pin and LED settings. Works on a Raspberry Pi Pico or Pico W.</p>
+        <ol class="small" style="margin:6px 0;padding-left:18px">
+          <li>Install MicroPython on the Pico (hold BOOTSEL while plugging it in, then copy the MicroPython .uf2 file onto it).</li>
+          <li>Save the downloaded file onto the Pico as <code>main.py</code>, e.g. with Thonny.</li>
+          <li>Close Thonny (only one program can use the USB port), then click <b>Connect USB</b> here and pick the Pico.</li>
+        </ol>
+        <div class="row end"><button class="btn sm primary" id="fwDownload">Download main.py</button></div>
+        <p class="small muted">The 3D view loads three.js from the internet; without internet the page falls back to a 2D schematic view.</p>
       </div>
       <div class="card">
         <div class="head"><h3>Configuration</h3></div>
@@ -542,6 +589,7 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
         <div class="row" style="margin-top:8px">
           <input type="text" id="rawCmd" class="grow mono" placeholder='{"t":"ping"}'>
           <button class="btn sm" id="rawSend">Send</button>
+          <button class="btn sm ghost" id="picoReset" title="Ctrl-C + Ctrl-D: restarts main.py on the Pico">Restart Pico</button>
         </div>
       </div>
     </div>
@@ -551,25 +599,18 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
 
 <!-- MicroPython firmware template (filled in by "Download main.py") -->
 <script type="text/plain" id="fwTemplate">
-# ArmCtl firmware for Raspberry Pi Pico W (MicroPython 1.20 or newer)
-# Generated by ArmCtl index.html. Copy this file as main.py and index.html to the Pico W.
-# Browse to http://<pico-ip>/  — or connect over USB with Web Serial.
-import network, time, json, sys, os, math, struct, hashlib, binascii, machine, neopixel, select
+# ArmCtl firmware for Raspberry Pi Pico / Pico W (MicroPython 1.20 or newer)
+# Generated by the ArmCtl page. Save this file on the Pico as main.py.
+# The page talks to it over USB (Web Serial): one JSON message per line.
+# To get back to the MicroPython prompt (e.g. in Thonny), press Ctrl-C.
+import time, json, sys, math, machine, neopixel, select
 try:
     import asyncio
 except ImportError:
     import uasyncio as asyncio
 
-WIFI_SSID = {{SSID}}
-WIFI_PASS = {{PASS}}
-AP_MODE = {{AP}}            # True: always create our own Wi-Fi network
-AP_SSID = {{AP_SSID}}
-AP_PASS = {{AP_PASS}}
-HOSTNAME = "armctl"
-
-FW = "armctl-1.0"
+FW = "armctl-usb-1.0"
 CFG_FILE = "arm_cfg.json"
-WS_GUID = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 # Pins & LED setup from the web page. A config saved from the page (arm_cfg.json) overrides it.
 cfg = json.loads('''{{CFG}}''')
@@ -579,7 +620,7 @@ try:
 except Exception:
     pass
 
-st = {"estop": False, "moved": 0, "seen": 0, "clients": 0}
+st = {"estop": False, "moved": 0, "seen": 0}
 led = {"mode": "status", "c1": [0, 120, 255, 0], "c2": [255, 0, 120, 0], "bri": 80, "speed": 50}
 led.update(cfg.get("fx", {}))
 pwms = []
@@ -786,140 +827,12 @@ async def serial_task():
         await asyncio.sleep_ms(4)
 
 
-# ---------------- HTTP + WebSocket server ----------------
-async def ws_send(w, obj):
-    data = json.dumps(obj).encode()
-    n = len(data)
-    hdr = bytes((0x81, n)) if n < 126 else bytes((0x81, 126)) + struct.pack(">H", n)
-    w.write(hdr + data)
-    await w.drain()
-
-
-async def ws_loop(r, w):
-    st["clients"] += 1
-    try:
-        while True:
-            h = await r.readexactly(2)
-            op = h[0] & 0x0F
-            n = h[1] & 0x7F
-            if n == 126:
-                n = struct.unpack(">H", await r.readexactly(2))[0]
-            elif n == 127:
-                n = struct.unpack(">Q", await r.readexactly(8))[0]
-            mask = await r.readexactly(4) if h[1] & 0x80 else b"\x00\x00\x00\x00"
-            data = bytearray(await r.readexactly(n)) if n else bytearray()
-            for i in range(n):
-                data[i] ^= mask[i & 3]
-            if op == 8:
-                w.write(b"\x88\x00")
-                await w.drain()
-                break
-            if op == 9 and n < 126:
-                w.write(bytes((0x8A, n)) + data)
-                await w.drain()
-            elif op == 1:
-                resp = handle(data.decode())
-                if resp:
-                    await ws_send(w, resp)
-    except Exception:
-        pass
-    finally:
-        st["clients"] -= 1
-
-
-async def send_file(w, path):
-    if path not in ("/", "/index.html"):
-        w.write(b"HTTP/1.1 404 Not Found\r\nContent-Length: 9\r\nConnection: close\r\n\r\nNot found")
-        await w.drain()
-        return
-    try:
-        size = os.stat("index.html")[6]
-    except OSError:
-        msg = b"index.html is missing - copy it to the Pico W next to main.py"
-        w.write(("HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: %d\r\nConnection: close\r\n\r\n" % len(msg)).encode() + msg)
-        await w.drain()
-        return
-    w.write(("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: %d\r\nCache-Control: no-cache\r\nConnection: close\r\n\r\n" % size).encode())
-    await w.drain()
-    buf = bytearray(1024)
-    with open("index.html", "rb") as f:
-        while True:
-            n = f.readinto(buf)
-            if not n:
-                break
-            w.write(bytes(buf[:n]))
-            await w.drain()
-
-
-async def client(r, w):
-    try:
-        line = await r.readline()
-        if not line:
-            return
-        parts = line.decode().split(" ")
-        path = parts[1] if len(parts) > 1 else "/"
-        hdr = {}
-        while True:
-            l = await r.readline()
-            if not l or l == b"\r\n":
-                break
-            k, _, v = l.decode().partition(":")
-            hdr[k.strip().lower()] = v.strip()
-        if hdr.get("upgrade", "").lower() == "websocket":
-            key = hdr.get("sec-websocket-key", "")
-            acc = binascii.b2a_base64(hashlib.sha1(key.encode() + WS_GUID).digest()).strip()
-            w.write(b"HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: " + acc + b"\r\n\r\n")
-            await w.drain()
-            await ws_loop(r, w)
-        else:
-            await send_file(w, path.split("?")[0])
-    except Exception as e:
-        print("http error", e)
-    finally:
-        try:
-            w.close()
-            await w.wait_closed()
-        except Exception:
-            pass
-
-
-def wifi_up():
-    if not AP_MODE and WIFI_SSID:
-        try:
-            network.hostname(HOSTNAME)
-        except Exception:
-            pass
-        w = network.WLAN(network.STA_IF)
-        w.active(True)
-        try:
-            w.config(pm=0xa11140)   # disable power saving -> lower latency
-        except Exception:
-            pass
-        w.connect(WIFI_SSID, WIFI_PASS)
-        for _ in range(40):
-            if w.isconnected():
-                break
-            time.sleep_ms(500)
-        if w.isconnected():
-            return w.ifconfig()[0]
-        print("Wi-Fi connection failed - starting access point")
-        w.active(False)
-    ap = network.WLAN(network.AP_IF)
-    ap.config(essid=AP_SSID, password=AP_PASS)
-    ap.active(True)
-    return ap.ifconfig()[0]
-
-
 async def main():
     setup_servos()
     setup_led()
     asyncio.create_task(led_task())
-    ip = wifi_up()
-    print(json.dumps({"t": "log", "msg": "ArmCtl ready at http://%s/" % ip}))
-    await asyncio.start_server(client, "0.0.0.0", 80)
-    asyncio.create_task(serial_task())
-    while True:
-        await asyncio.sleep(1)
+    print(json.dumps({"t": "log", "msg": "ArmCtl ready on USB"}))
+    await serial_task()
 
 
 asyncio.run(main())
@@ -964,9 +877,22 @@ const LED_TYPES = {
   'Custom':      { order: null,   bpp: null, khz: null, info: 'Set the color order, channels and data rate manually.' },
 };
 
+// Built-in examples. Pick & place uses straight-line (IK) moves to go down to and up from the table.
+const DEMO_ANIMS = (() => {
+  const k = (t, base, shoulder, elbow, gripper, move = 'joint', ease = 'smooth') => ({ t, q: { base, shoulder, elbow, gripper }, move, ease });
+  const A = [-14.8, 40.2, -3.7], Ad = [-14.8, 55.8, 2], B = [29.5, 40.4, -3.4], Bd = [29.5, 55.8, 2];   // above / down at (135, ∓55) mm
+  return [
+    { name: 'Pick and place', loop: false, keys: [
+      k(0, 0, 0, 0, 50), k(1.5, ...A, 100), k(2.7, ...Ad, 100, 'line'), k(3.4, ...Ad, 0), k(4.6, ...A, 0, 'line'),
+      k(6.2, ...B, 0), k(7.4, ...Bd, 0, 'line'), k(8.1, ...Bd, 100), k(9.3, ...B, 100, 'line'), k(11, 0, 0, 0, 50)] },
+    { name: 'Wave', loop: true, keys: [
+      k(0, 0, 0, 0, 50), k(1, 0, -10, 70, 50), k(1.6, 30, -10, 70, 100), k(2.2, -30, -10, 70, 0),
+      k(2.8, 30, -10, 70, 100), k(3.4, -30, -10, 70, 0), k(4.2, 0, -10, 70, 50), k(5.4, 0, 0, 0, 50)] },
+  ];
+})();
 const servoDefaults = (pin, type, extra = {}) => ({ pin, type, center: 90, invert: false, minAngle: 0, maxAngle: 180, minUs: 500, maxUs: 2500, range: 180, ...extra });
 const DEFAULT_CFG = {
-  version: 2,
+  version: 3,
   theme: 'auto',
   mode: 'sim',
   speed: 50,
@@ -985,8 +911,8 @@ const DEFAULT_CFG = {
   typeSpeed: { MG90S: 400 },
   led: { enabled: true, type: 'WS2812B', pin: 16, count: 8, order: 'GRB', bpp: 3, khz: 800,
          mode: 'status', color1: '#0078ff', color2: '#ff0078', white: 0, brightness: 80, speed: 50 },
-  conn: { transport: 'ws', host: '', port: 80, path: '/ws', baud: 115200, rate: 25, autoReconnect: true },
-  view: { grid: true, envelope: true, axes: false, shadows: true, ikMarker: true, trail: false },
+  conn: { rate: 30, autoReconnect: true },
+  view: { grid: true, envelope: true, axes: false, shadows: true, ikMarker: true, trail: false, animPath: true },
   sim: { realistic: true, ghost: false, tolerance: 12, poseTol: 8 },
   safety: { floor: true },
   practice: { best: {} },
@@ -996,14 +922,21 @@ const DEFAULT_CFG = {
     { name: 'Look left',     q: { base: 60, shoulder: 15, elbow: 10, gripper: 50 } },
     { name: 'Stand tall',    q: { base: 0, shoulder: 0, elbow: 80, gripper: 0 } },
   ],
-  sequence: [],
-  seqLoop: false,
-  seqDwell: 400,
+  anims: DEMO_ANIMS,
+  animSel: 0,
+  animGap: 1,
 };
 // Settings from the earlier 6-axis version of this page don't fit this arm: drop its hardware settings
 const HW_KEYS = ['joints', 'servos', 'geometry', 'wristMode', 'typeSpeed', 'poses', 'sequence', 'practice'];
 function loadCfg(saved) {
-  if (saved.version !== DEFAULT_CFG.version) for (const k of HW_KEYS) delete saved[k];
+  const v = saved.version || 1;
+  if (v < 2) for (const k of HW_KEYS) delete saved[k];
+  if (v < 3) {                                   // v3: USB only, sequences became animations
+    if (saved.conn) for (const k of ['transport', 'host', 'port', 'path', 'baud']) delete saved.conn[k];
+    if (saved.sequence?.length) saved.anims = [...structuredClone(DEMO_ANIMS), { name: 'My sequence', loop: !!saved.seqLoop,
+      keys: saved.sequence.map((p, i) => ({ t: i * 1.5, q: p.q, move: 'joint', ease: 'smooth' })) }];
+    for (const k of ['sequence', 'seqLoop', 'seqDwell']) delete saved[k];
+  }
   delete saved.version;
   return merge(DEFAULT_CFG, saved);
 }
@@ -1037,7 +970,6 @@ const state = {
   overrides: {},          // calibration direct drive: servoId -> servo angle
   keys: new Set(),
   ik: { x: 0, y: 0, z: 0 },
-  seq: { playing: false, idx: 0, reachedAt: 0 },
 };
 
 /* ---------------- small UI helpers ---------------- */
@@ -1170,54 +1102,31 @@ function pulses() {
 }
 
 /* =====================================================================
-   Connection (WebSocket over Wi-Fi, or Web Serial over USB)
+   Connection: USB (Web Serial) to MicroPython main.py, one JSON message per line
    ===================================================================== */
+const PICO_VID = 0x2e8a;                       // Raspberry Pi (RP2040) USB vendor id
 const link = {
-  kind: null, ws: null, port: null, reader: null, writer: null, connected: false, connecting: false,
-  wantOpen: false, retry: 0, lastPong: 0, rtt: null, lastSent: '', lastSendT: 0, pingT: 0, fw: '',
+  port: null, reader: null, writer: null, connected: false, connecting: false,
+  wantOpen: false, lastPong: 0, rtt: null, lastSent: '', lastSendT: 0, fw: '', silentWarned: false,
 
-  wsUrl() {
-    const c = cfg.conn; const host = c.host || location.hostname || '192.168.4.1';
-    const path = c.path.startsWith('/') ? c.path : '/' + c.path;
-    return `ws://${host}${+c.port === 80 ? '' : ':' + c.port}${path}`;
-  },
-  async open() {
+  async open(port) {
     if (this.connected || this.connecting) return;
-    this.wantOpen = true; this.connecting = true; updateConn();
+    if (!('serial' in navigator)) { toast('USB needs Chrome or Edge on a computer'); log('Web Serial is not supported in this browser — use Chrome or Edge on Windows, macOS, Linux or ChromeOS.', 'er'); return; }
+    this.connecting = true; updateConn();
     try {
-      if (cfg.conn.transport === 'serial') await this.openSerial(); else await this.openWs();
+      if (!port) {
+        const picos = (await navigator.serial.getPorts()).filter(p => p.getInfo().usbVendorId === PICO_VID);
+        port = picos.length === 1 ? picos[0] : await navigator.serial.requestPort();
+      }
+      await port.open({ baudRate: 115200 });
+      this.port = port; this.wantOpen = true;
+      this.writer = port.writable.getWriter();
+      this.onOpen();
+      this.readSerial();
     } catch (e) {
-      this.connecting = false; log('Connect failed: ' + (e.message || e), 'er'); updateConn();
-      if (cfg.conn.transport === 'ws') this.scheduleRetry(); else this.wantOpen = false;
+      this.connecting = false; updateConn();
+      if (e.name !== 'NotFoundError') log('Connect failed: ' + e.message + (e.name === 'NetworkError' ? ' (is Thonny or another program using the port?)' : ''), 'er');
     }
-  },
-  openWs() {
-    return new Promise((resolve, reject) => {
-      if (location.protocol === 'https:') log('Note: browsers block ws:// from https pages. Open this page from the Pico (http) or use USB.', 'er');
-      const url = this.wsUrl(); log('Connecting to ' + url);
-      let ws; try { ws = new WebSocket(url); } catch (e) { reject(e); return; }
-      this.ws = ws; this.kind = 'ws';
-      const to = setTimeout(() => { ws.close(); reject(new Error('timeout')); }, 5000);
-      ws.onopen = () => { clearTimeout(to); this.onOpen(); resolve(); };
-      ws.onmessage = ev => this.onLine(String(ev.data));
-      ws.onerror = () => {};
-      ws.onclose = () => {
-        clearTimeout(to);
-        const wasConnected = this.connected;
-        if (this.ws === ws) this.onClose();
-        if (wasConnected) { log('Connection closed', 'er'); this.scheduleRetry(); }
-        else reject(new Error('could not reach ' + url));   // open() handles the retry
-      };
-    });
-  },
-  async openSerial() {
-    if (!('serial' in navigator)) throw new Error('Web Serial is not supported in this browser (use Chrome or Edge on desktop).');
-    const port = await navigator.serial.requestPort();
-    await port.open({ baudRate: +cfg.conn.baud || 115200 });
-    this.port = port; this.kind = 'serial';
-    this.writer = port.writable.getWriter();
-    this.onOpen();
-    this.readSerial();
   },
   async readSerial() {
     const dec = new TextDecoder(); let buf = '';
@@ -1228,58 +1137,58 @@ const link = {
         if (done) break;
         buf += dec.decode(value, { stream: true });
         let i; while ((i = buf.indexOf('\n')) >= 0) { const l = buf.slice(0, i).trim(); buf = buf.slice(i + 1); if (l) this.onLine(l); }
+        if (buf.length > 8192) buf = '';
       }
-    } catch (e) { if (this.connected) log('Serial error: ' + e.message, 'er'); }
+    } catch (e) { if (this.connected) log('USB error: ' + e.message, 'er'); }
     finally { try { this.reader.releaseLock(); } catch (e) {} }
-    if (this.connected) this.close();
+    if (this.connected) this.close(false);     // unplugged: keep wantOpen so it reconnects when plugged back in
   },
   onOpen() {
-    this.connected = true; this.connecting = false; this.retry = 0; this.lastPong = performance.now(); this.lastSent = '';
-    log('Connected (' + (this.kind === 'ws' ? 'Wi-Fi' : 'USB') + ')', 'rx'); toast('Connected to Pico W');
-    if (this.kind === 'serial') this.raw('\r\n');
+    this.connected = true; this.connecting = false; this.lastPong = performance.now(); this.lastSent = ''; this.silentWarned = false;
+    log('Connected over USB', 'rx'); toast('Connected to the Pico');
+    this.raw('\r\n');
     this.send({ t: 'hello' });
     this.send(cfgPacket(false));
     this.send(ledPacket(false));
     updateConn();
   },
-  onClose() {
-    this.connected = false; this.connecting = false; this.ws = null; this.rtt = null; updateConn();
-  },
-  scheduleRetry() {
-    if (!this.wantOpen || !cfg.conn.autoReconnect || this.kind === 'serial') return;
-    const d = Math.min(8000, 800 * 2 ** this.retry++);
-    setTimeout(() => { if (this.wantOpen && !this.connected) this.open(); }, d);
-  },
-  async close() {
-    this.wantOpen = false;
-    const was = this.connected;
-    if (this.ws) { try { this.ws.close(); } catch (e) {} }
-    if (this.port) {
-      const p = this.port; this.port = null; this.connected = false;
+  async close(byUser = true) {
+    if (byUser) this.wantOpen = false;
+    const was = this.connected, p = this.port;
+    this.connected = false; this.connecting = false; this.port = null; this.rtt = null;
+    if (p) {
       try { await this.reader?.cancel(); } catch (e) {}
       try { this.writer?.releaseLock(); } catch (e) {}
       try { await p.close(); } catch (e) {}
     }
-    this.onClose(); if (was) log('Disconnected');
+    this.writer = null; updateConn(); updateWarnings();
+    if (was) log(byUser ? 'Disconnected' : 'USB connection lost', byUser ? '' : 'er');
   },
-  raw(text) {
-    if (this.kind === 'ws' && this.ws?.readyState === 1) this.ws.send(text);
-    else if (this.kind === 'serial' && this.writer) this.writer.write(new TextEncoder().encode(text)).catch(() => {});
-  },
+  raw(text) { if (this.writer) this.writer.write(new TextEncoder().encode(text)).catch(() => {}); },
   send(obj) {
     if (!this.connected) return false;
     const text = JSON.stringify(obj);
-    this.raw(this.kind === 'serial' ? text + '\n' : text);
+    this.raw(text + '\n');
     if (obj.t !== 'pos' && obj.t !== 'ping' || $('#logVerbose').checked) log('→ ' + text, 'tx');
     return true;
   },
   onLine(line) {
-    let m; try { m = JSON.parse(line); } catch (e) { log('« ' + line); return; }
-    if (m.t === 'pong') { this.lastPong = performance.now(); this.rtt = Math.round(performance.now() - (m.id || 0)); updateConn(); return; }
+    let m; try { m = JSON.parse(line); } catch (e) {
+      log('« ' + line);
+      if (/^(>>>|MicroPython|Type "help)/.test(line)) log('The Pico is at the MicroPython prompt, so main.py is not running. Save main.py on the Pico, then press "Restart Pico".', 'er');
+      return;
+    }
+    if (m.t === 'pong') { this.lastPong = performance.now(); this.rtt = Math.round(performance.now() - (m.id || 0)); this.silentWarned = false; updateConn(); return; }
     if (m.t === 'hello') { this.fw = m.fw || ''; }
     log('← ' + line, 'rx');
   },
 };
+if ('serial' in navigator) {
+  navigator.serial.addEventListener('connect', e => {
+    if (link.wantOpen && cfg.conn.autoReconnect && !link.connected) { log('Pico plugged in — reconnecting'); setTimeout(() => link.open(e.target), 800); }
+  });
+  navigator.serial.addEventListener('disconnect', e => { if (e.target === link.port && link.connected) link.close(false); });
+}
 const live = () => cfg.mode === 'live';
 function cfgPacket(save) {
   const L = cfg.led;
@@ -1297,20 +1206,22 @@ function ledPacket(save) {
 function updateConn() {
   const dot = $('#connDot'), txt = $('#connText'), btn = $('#connBtn');
   dot.className = 'dot' + (link.connected ? ' ok' : link.connecting ? ' warn' : '');
-  const via = cfg.conn.transport === 'serial' ? 'USB' : 'Wi-Fi';
-  txt.textContent = link.connected ? `${via} connected${link.rtt != null ? ' · ' + link.rtt + ' ms' : ''}` : link.connecting ? 'Connecting…' : 'Disconnected';
-  btn.textContent = link.connected || link.connecting ? 'Disconnect' : 'Connect';
+  txt.textContent = link.connected ? `USB connected${link.rtt != null ? ' · ' + link.rtt + ' ms' : ''}` : link.connecting ? 'Connecting…' : 'Disconnected';
+  btn.textContent = link.connected || link.connecting ? 'Disconnect' : 'Connect USB';
 }
 // keep-alive + latency
 setInterval(() => {
   if (!link.connected) return;
   link.send({ t: 'ping', id: Math.round(performance.now()) });
-  if (link.kind === 'ws' && performance.now() - link.lastPong > 7000) { log('No reply from Pico — reconnecting', 'er'); try { link.ws.close(); } catch (e) {} }
+  if (performance.now() - link.lastPong > 6000 && !link.silentWarned) {
+    link.silentWarned = true;
+    log('No reply from the Pico — is main.py running on it? Try "Restart Pico" in Settings.', 'er');
+  }
 }, 2000);
 
 function sendPositions(now) {
   if (!live() || !link.connected || state.estop) return;
-  if (now - link.lastSendT < 1000 / clamp(+cfg.conn.rate || 25, 5, 60)) return;
+  if (now - link.lastSendT < 1000 / clamp(+cfg.conn.rate || 30, 5, 60)) return;
   const us = pulses(); const key = us.join(',');
   if (key === link.lastSent && now - link.lastSendT < 1000) return;   // resend once a second as a heartbeat
   link.lastSent = key; link.lastSendT = now;
@@ -1323,50 +1234,50 @@ function sendPositions(now) {
 function setJoint(id, v, from = 'ui') {
   const L = cfg.joints[id];
   state.target[id] = clamp(Number(v) || 0, L.min, L.max);
-  if (from !== 'ik' && from !== 'seq') stopSeq();
+  if (from !== 'anim') stopAnim();
   onTargetChanged(from);
 }
 function setPose(q, from = 'ui') {
   for (const j of JOINTS) if (q[j.id] != null) state.target[j.id] = clamp(q[j.id], cfg.joints[j.id].min, cfg.joints[j.id].max);
-  if (from !== 'seq') stopSeq();
+  if (from !== 'anim') stopAnim();
   onTargetChanged(from);
 }
 function onTargetChanged(from) {
   refreshJointUI();
   if (from !== 'ik') syncIkFromTarget();
 }
-function jointSpeed(id) {   // deg/s (or %/s for the gripper)
-  const base = id === 'gripper' ? cfg.typeSpeed.MG90S * 0.6 : cfg.typeSpeed.MG90S;
-  return base * cfg.speed / 100;
-}
+const servoSpeed = id => id === 'gripper' ? cfg.typeSpeed.MG90S * 0.6 : cfg.typeSpeed.MG90S;   // deg/s (%/s for the gripper) at full speed
+const jointSpeed = id => servoSpeed(id) * cfg.speed / 100;
 
 /* =====================================================================
    UI: joints
    ===================================================================== */
 function buildJointRows() {
-  const wrap = $('#jointRows'); wrap.innerHTML = '';
-  for (const j of JOINTS) {
-    const L = cfg.joints[j.id];
-    const row = document.createElement('div'); row.className = 'jrow'; row.dataset.joint = j.id;
-    row.innerHTML = `
-      <div class="jhead"><span class="jname">${j.name}</span><span class="jtype">${j.servo}</span>
-        <span class="jnow" data-now></span><span class="jlim">${L.min}…${L.max}${j.unit}</span></div>
-      <div class="jctl">
-        <button class="btn icon" data-d="-1" title="−1 (Shift: −10)">−</button>
-        <input type="range" min="${L.min}" max="${L.max}" step="1" aria-label="${j.name}">
-        <button class="btn icon" data-d="1" title="+1 (Shift: +10)">+</button>
-        <input type="number" min="${L.min}" max="${L.max}" step="1" aria-label="${j.name} value">
-      </div>`;
-    const rng = $('input[type=range]', row), num = $('input[type=number]', row);
-    rng.addEventListener('input', () => setJoint(j.id, +rng.value));
-    num.addEventListener('change', () => setJoint(j.id, +num.value));
-    $$('button[data-d]', row).forEach(b => b.addEventListener('click', e => setJoint(j.id, state.target[j.id] + (+b.dataset.d) * (e.shiftKey ? 10 : 1))));
-    wrap.appendChild(row);
+  for (const wrap of $$('.jointRows')) {
+    wrap.innerHTML = '';
+    for (const j of JOINTS) {
+      const L = cfg.joints[j.id];
+      const row = document.createElement('div'); row.className = 'jrow'; row.dataset.joint = j.id;
+      row.innerHTML = `
+        <div class="jhead"><span class="jname">${j.name}</span><span class="jtype">${j.servo}</span>
+          <span class="jnow" data-now></span><span class="jlim">${L.min}…${L.max}${j.unit}</span></div>
+        <div class="jctl">
+          <button class="btn icon" data-d="-1" title="−1 (Shift: −10)">−</button>
+          <input type="range" min="${L.min}" max="${L.max}" step="1" aria-label="${j.name}">
+          <button class="btn icon" data-d="1" title="+1 (Shift: +10)">+</button>
+          <input type="number" min="${L.min}" max="${L.max}" step="1" aria-label="${j.name} value">
+        </div>`;
+      const rng = $('input[type=range]', row), num = $('input[type=number]', row);
+      rng.addEventListener('input', () => setJoint(j.id, +rng.value));
+      num.addEventListener('change', () => setJoint(j.id, +num.value));
+      $$('button[data-d]', row).forEach(b => b.addEventListener('click', e => setJoint(j.id, state.target[j.id] + (+b.dataset.d) * (e.shiftKey ? 10 : 1))));
+      wrap.appendChild(row);
+    }
   }
   refreshJointUI();
 }
 function refreshJointUI() {
-  for (const row of $$('#jointRows .jrow')) {
+  for (const row of $$('.jointRows .jrow')) {
     const id = row.dataset.joint, v = round(state.target[id]);
     const rng = $('input[type=range]', row), num = $('input[type=number]', row);
     if (+rng.value !== v) rng.value = v;
@@ -1374,7 +1285,7 @@ function refreshJointUI() {
   }
 }
 function refreshJointNow() {
-  for (const row of $$('#jointRows .jrow')) {
+  for (const row of $$('.jointRows .jrow')) {
     const id = row.dataset.joint, c = state.current[id], t = state.target[id];
     $('[data-now]', row).textContent = Math.abs(c - t) > 0.5 ? `moving · ${round(c)}` : '';
   }
@@ -1411,7 +1322,7 @@ function ikStatus(msg, cls) {
 function ikGo(quick = false) {
   const r = solveIK(state.ik, state.target, quick);
   if (r.ok) {
-    stopSeq();
+    stopAnim();
     for (const k of IK_J) state.target[k] = r.q[k];
     onTargetChanged('ik');
     ikStatus(`Reachable ✓  error ${r.pe.toFixed(1)} mm · gripper pitch ${round(fk(state.target).pitch)}°`, 'ok');
@@ -1440,7 +1351,7 @@ function setupIk() {
 }
 
 /* =====================================================================
-   UI: poses & sequences
+   UI: saved poses
    ===================================================================== */
 const snap = q => Object.fromEntries(JOINTS.map(j => [j.id, round(q[j.id], 1)]));
 function renderPoses() {
@@ -1449,49 +1360,286 @@ function renderPoses() {
   cfg.poses.forEach((p, i) => {
     const el = document.createElement('div'); el.className = 'item';
     el.innerHTML = `<span class="name" title="${esc(JOINTS.map(j => `${j.name}: ${p.q[j.id]}`).join('\n'))}">${esc(p.name)}</span>
-      <button class="btn sm" data-a="go">Go</button><button class="btn sm" data-a="seq" title="Add to sequence">+ Seq</button>
+      <button class="btn sm" data-a="go">Go</button><button class="btn sm" data-a="key" title="Add to the current animation">+ Key</button>
       <button class="btn sm ghost" data-a="del" title="Delete">✕</button>`;
     el.addEventListener('click', e => {
       const a = e.target.dataset.a; if (!a) return;
       if (a === 'go') setPose(p.q);
-      if (a === 'seq') { cfg.sequence.push({ name: p.name, q: { ...p.q } }); saveCfg(); renderSeq(); }
+      if (a === 'key') { addKey(nextKeyTime(), p.q); toast(`Added “${p.name}” to “${curAnim().name}”`); }
       if (a === 'del') { cfg.poses.splice(i, 1); saveCfg(); renderPoses(); }
     });
     pl.appendChild(el);
   });
 }
-function renderSeq() {
-  const sl = $('#seqList');
-  sl.innerHTML = cfg.sequence.length ? '' : '<div class="empty">Add poses with “+ Seq” to build a sequence</div>';
-  cfg.sequence.forEach((s, i) => {
-    const el = document.createElement('div'); el.className = 'item' + (state.seq.playing && state.seq.idx === i ? ' playing' : '');
-    el.innerHTML = `<span class="mono small muted">${i + 1}</span><span class="name">${esc(s.name)}</span>
-      <button class="btn sm ghost" data-a="up" title="Move up">↑</button><button class="btn sm ghost" data-a="del" title="Remove">✕</button>`;
-    el.addEventListener('click', e => {
-      const a = e.target.dataset.a; if (!a) return;
-      if (a === 'up' && i > 0) [cfg.sequence[i - 1], cfg.sequence[i]] = [cfg.sequence[i], cfg.sequence[i - 1]];
-      if (a === 'del') cfg.sequence.splice(i, 1);
-      saveCfg(); renderSeq();
-    });
-    sl.appendChild(el);
-  });
+
+/* =====================================================================
+   Animations: keyframes on a timeline
+   key = { t: seconds, q: pose, move: 'joint' | 'line', ease: 'smooth' | 'linear' }
+   'line' moves the gripper along a straight line from the previous keyframe (solved with IK).
+   ===================================================================== */
+const anim = { playing: false, phase: 'run', t: 0, sel: -1, rec: null, cache: null, statusMsg: '' };
+const curAnim = () => { if (!cfg.anims.length) cfg.anims.push({ name: 'Animation 1', loop: false, keys: [] }); cfg.animSel = clamp(cfg.animSel | 0, 0, cfg.anims.length - 1); return cfg.anims[cfg.animSel]; };
+const animDur = a => a.keys.length ? a.keys[a.keys.length - 1].t : 0;
+const easeFn = (u, e) => e === 'linear' ? u : u * u * (3 - 2 * u);
+const JOINT_COLORS = { base: '#2f7cf6', shoulder: '#f26b1d', elbow: '#1f9d55', gripper: '#a855f7' };
+
+// Pose at time t. Returns { q, err } where err is the IK error (mm) of a straight-line segment.
+function animPose(a, t) {
+  const K = a.keys;
+  if (!K.length) return null;
+  if (t <= K[0].t) return { q: { ...K[0].q }, err: 0 };
+  for (let i = 1; i < K.length; i++) {
+    if (t > K[i].t) continue;
+    const A = K[i - 1], B = K[i], u = easeFn((t - A.t) / Math.max(1e-6, B.t - A.t), B.ease);
+    const q = {};
+    for (const j of JOINTS) q[j.id] = A.q[j.id] + (B.q[j.id] - A.q[j.id]) * u;
+    let err = 0;
+    if (B.move === 'line' && u > 0 && u < 1) {
+      const pa = fk(A.q).tip, pb = fk(B.q).tip;
+      const r = solveIK({ x: pa.x + (pb.x - pa.x) * u, y: pa.y + (pb.y - pa.y) * u, z: pa.z + (pb.z - pa.z) * u }, q, true);
+      for (const k of IK_J) q[k] = r.q[k];
+      err = r.pe;
+    }
+    return { q, err };
+  }
+  return { q: { ...K[K.length - 1].q }, err: 0 };
 }
-function playSeq() {
-  if (!cfg.sequence.length) { toast('The sequence is empty'); return; }
+// Sampled curves, tool path and per-segment checks (servo speed, straight-line reachability). Rebuilt when keys change.
+function animInfo() {
+  const a = curAnim(), sig = JSON.stringify(a.keys) + cfg.typeSpeed.MG90S + JSON.stringify(cfg.joints) + cfg.safety.floor;
+  if (anim.cache && anim.cache.sig === sig) return anim.cache;
+  const K = a.keys, samples = [], seg = K.map(() => ({ speed: 0, err: 0 })), dur = animDur(a), dt = 0.04;
+  let prev = null;
+  for (let i = 0, n = Math.ceil(dur / dt); i <= n && K.length; i++) {
+    const t = Math.min(dur, i * dt), r = animPose(a, t), si = Math.max(1, K.findIndex(k => k.t >= t - 1e-9));
+    samples.push({ t, q: r.q, tip: fk(r.q).tip });
+    if (K.length > 1) {
+      seg[si].err = Math.max(seg[si].err, r.err);
+      if (prev && t > prev.t) for (const j of JOINTS)
+        seg[si].speed = Math.max(seg[si].speed, Math.abs(r.q[j.id] - prev.q[j.id]) / (t - prev.t) / servoSpeed(j.id));
+    }
+    prev = { t, q: r.q };
+  }
+  return (anim.cache = { sig, samples, seg, dur });
+}
+const segProblem = (s, speed = 1) => s.err > 2 ? 'path out of reach' : s.speed * speed > 1.05 ? `too fast ×${(s.speed * speed).toFixed(1)}` : '';
+function animChanged() {
+  const a = curAnim();
+  a.keys.sort((x, y) => x.t - y.t);
+  if (a.keys.length) { const t0 = a.keys[0].t; if (t0 !== 0) a.keys.forEach(k => k.t = round(k.t - t0, 3)); }
+  anim.t = clamp(anim.t, 0, animDur(a));
+  saveCfg(); renderAnimUI(); updateAnimPath();
+}
+const nextKeyTime = () => { const a = curAnim(); return a.keys.length ? round(animDur(a) + Math.max(0.1, +cfg.animGap || 1), 3) : 0; };
+function addKey(t, q, opts = {}) {
+  const a = curAnim();
+  const k = { t: round(t, 3), q: snap(q), move: 'joint', ease: 'smooth', ...opts };
+  const same = a.keys.findIndex(x => Math.abs(x.t - k.t) < 0.01);
+  if (same >= 0) a.keys[same] = k; else a.keys.push(k);
+  animChanged();
+  anim.sel = a.keys.indexOf(k); anim.t = k.t;
+  renderAnimUI();
+}
+function animStatus(msg, cls = '') { anim.statusMsg = msg; const el = $('#animStatus'); el.textContent = msg; el.className = 'status ' + cls; }
+function playAnim() {
+  const a = curAnim();
+  if (a.keys.length < 2) { toast('Add at least two keyframes first'); return; }
   if (state.estop) { toast('Release the E-stop first'); return; }
-  state.seq = { playing: true, idx: 0, reachedAt: 0 };
-  setPose(cfg.sequence[0].q, 'seq'); renderSeq();
+  stopRec(); prac.stop(false);
+  if (anim.t >= animDur(a) - 1e-6) anim.t = 0;
+  anim.playing = true; anim.phase = 'approach';
+  setPose(animPose(a, anim.t).q, 'anim');
+  animStatus(live() ? 'Moving the arm to the start pose…' : 'Playing in the simulator', 'ok');
+  renderAnimUI();
 }
-function stopSeq() { if (state.seq.playing) { state.seq.playing = false; renderSeq(); } }
-function stepSeq(now) {
-  const s = state.seq; if (!s.playing) return;
-  const reached = JOINTS.every(j => Math.abs(state.current[j.id] - state.target[j.id]) < 0.6);
-  if (!reached) { s.reachedAt = 0; return; }
-  if (!s.reachedAt) s.reachedAt = now;
-  if (now - s.reachedAt < (+cfg.seqDwell || 0)) return;
-  s.idx++; s.reachedAt = 0;
-  if (s.idx >= cfg.sequence.length) { if (cfg.seqLoop) s.idx = 0; else { stopSeq(); toast('Sequence finished'); return; } }
-  setPose(cfg.sequence[s.idx].q, 'seq'); renderSeq();
+function stopAnim(rewind = false) {
+  if (anim.playing) { anim.playing = false; animStatus(rewind ? 'Stopped' : 'Paused'); }
+  if (rewind) anim.t = 0;
+  renderTransport();
+}
+function stepAnim(dt) {
+  if (!anim.playing) return;
+  const a = curAnim(), dur = animDur(a);
+  if (anim.phase === 'approach') {           // let the servos reach the pose before the clock runs
+    if (JOINTS.some(j => Math.abs(state.current[j.id] - state.target[j.id]) > 1)) return;
+    anim.phase = 'run'; animStatus(live() ? 'Playing on the arm (USB)' : 'Playing in the simulator', 'ok');
+  }
+  anim.t += dt * +$('#animSpeed').value;
+  if (anim.t >= dur) {
+    if (a.loop) { anim.t = 0; anim.phase = 'approach'; }
+    else { anim.t = dur; anim.playing = false; animStatus('Finished'); renderTransport(); }
+  }
+  setPose(animPose(a, anim.t).q, 'anim');
+}
+// Recording: samples the arm 4× a second and keeps a keyframe whenever it moved
+function startRec() {
+  if (anim.rec) return;
+  stopAnim();
+  anim.rec = { t0: performance.now(), base: nextKeyTime(), last: 0, prevQ: null, prevT: 0, still: false };
+  animStatus('Recording — move the arm with the sliders, keyboard or the blue ball. Press Record again to stop.', 'err');
+  renderTransport();
+}
+function stopRec() {
+  if (!anim.rec) return;
+  anim.rec = null; animStatus(`Recorded — ${curAnim().keys.length} keyframes`); renderTransport();
+}
+function stepRec(now) {
+  const r = anim.rec; if (!r || now - r.last < 250) return;
+  r.last = now;
+  const t = r.base + (now - r.t0) / 1000, q = snap(state.current);
+  const moved = !r.prevQ || JOINTS.some(j => Math.abs(q[j.id] - r.prevQ[j.id]) > 0.8);
+  if (moved) {
+    if (r.still) addKey(r.prevT, r.prevQ, { ease: 'linear' });     // the arm was holding still until here
+    addKey(t, q, { ease: 'linear' }); r.still = false;
+  } else r.still = true;
+  r.prevQ = q; r.prevT = t;
+}
+
+function renderAnimUI() {
+  const a = curAnim();
+  $('#animSel').innerHTML = cfg.anims.map((x, i) => `<option value="${i}"${i === cfg.animSel ? ' selected' : ''}>${esc(x.name)}</option>`).join('');
+  $('#animLoop').checked = !!a.loop;
+  const info = animInfo();
+  $('#animInfo').textContent = `${a.keys.length} keys · ${animDur(a).toFixed(1)} s`;
+  const kl = $('#keyList');
+  kl.innerHTML = a.keys.length ? '' : '<div class="empty">No keyframes yet. Pose the arm and press “+ Keyframe”.</div>';
+  a.keys.forEach((k, i) => {
+    const el = document.createElement('div'); el.className = 'item key' + (i === anim.sel ? ' sel' : '');
+    const prob = i ? segProblem(info.seg[i]) : '';
+    el.innerHTML = `<span class="mono small muted">${i + 1}</span>
+      <input type="number" min="0" step="0.1" value="${k.t}" data-k="t" aria-label="Time (s)"${i ? '' : ' disabled title="The first keyframe is always at 0 s"'}><span class="small muted">s</span>
+      <select data-k="move"${i ? '' : ' disabled'} aria-label="Move type"><option value="joint">Joint</option><option value="line"${k.move === 'line' ? ' selected' : ''}>Straight</option></select>
+      <select data-k="ease"${i ? '' : ' disabled'} aria-label="Easing"><option value="smooth">Smooth</option><option value="linear"${k.ease === 'linear' ? ' selected' : ''}>Linear</option></select>
+      <span class="q" title="Base, shoulder, elbow (°), gripper (%)">B ${round(k.q.base)} · S ${round(k.q.shoulder)} · E ${round(k.q.elbow)} · G ${round(k.q.gripper)}%</span>
+      ${prob ? `<span class="tag err">${prob}</span>` : ''}
+      <button class="btn sm" data-a="set" title="Replace with the arm's current pose">Set</button>
+      <button class="btn sm ghost" data-a="del" title="Delete keyframe">✕</button>`;
+    el.addEventListener('change', e => {
+      const f = e.target.dataset.k; if (!f) return;
+      k[f] = f === 't' ? Math.max(0.01, +e.target.value || 0) : e.target.value;
+      animChanged();
+    });
+    el.addEventListener('click', e => {
+      if (e.target.closest('input,select')) return;
+      const act = e.target.dataset.a;
+      if (act === 'del') { a.keys.splice(i, 1); anim.sel = -1; animChanged(); return; }
+      if (act === 'set') { k.q = snap(state.target); animChanged(); toast(`Keyframe ${i + 1} updated`); return; }
+      anim.sel = i; anim.t = k.t; stopAnim(); setPose(k.q, 'anim'); renderAnimUI();
+    });
+    kl.appendChild(el);
+  });
+  const problems = info.seg.slice(1).filter(sg => segProblem(sg)).length;
+  if (!anim.playing && !anim.rec) animStatus(a.keys.length < 2 ? 'Add at least two keyframes to play.' :
+    problems ? `${problems} segment${problems > 1 ? 's' : ''} marked red: give ${problems > 1 ? 'them' : 'it'} more time or change the poses.` : 'Ready to play.', problems ? 'err' : '');
+  renderTransport();
+}
+function renderTransport() {
+  $('#animPlay').textContent = anim.playing ? '❚❚ Pause' : '▶ Play';
+  $('#animRec').classList.toggle('on', !!anim.rec);
+  $('#animRec').textContent = anim.rec ? '● Recording' : '● Record';
+  $('#animTime').textContent = `${anim.t.toFixed(2)} / ${animDur(curAnim()).toFixed(2)} s`;
+}
+// Timeline canvas: joint curves, keyframe diamonds, problem segments, playhead
+const tl = { drag: null };
+function tlGeom() {
+  const cv = $('#timeline'), r = cv.getBoundingClientRect(), dur = animDur(curAnim());
+  const span = tl.drag?.span || Math.max(2, dur * 1.06 + 0.2), L = 10, R = r.width - 10;   // fixed while dragging
+  return { cv, r, span, L, R, top: 22, bot: r.height - 18, x: t => L + t / span * (R - L), t: x => clamp((x - L) / (R - L) * span, 0, span) };
+}
+function drawTimeline() {
+  const g = tlGeom(), { cv, r } = g;
+  if (!r.width) return;
+  const dpr = Math.min(devicePixelRatio, 2);
+  if (cv.width !== Math.round(r.width * dpr) || cv.height !== Math.round(r.height * dpr)) { cv.width = r.width * dpr; cv.height = r.height * dpr; }
+  const c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, r.width, r.height);
+  const a = curAnim(), K = a.keys, info = animInfo(), muted = cssVar('--muted'), border = cssVar('--border');
+  c.font = '10px ' + cssVar('--mono'); c.textAlign = 'center';
+  const step = g.span > 30 ? 5 : g.span > 12 ? 2 : 1;
+  for (let t = 0; t <= g.span; t += step) {
+    c.strokeStyle = border; c.lineWidth = 1; c.beginPath(); c.moveTo(g.x(t) + 0.5, g.top); c.lineTo(g.x(t) + 0.5, g.bot); c.stroke();
+    c.fillStyle = muted; c.fillText(t + 's', g.x(t), r.height - 5);
+  }
+  for (let i = 1; i < K.length; i++) if (segProblem(info.seg[i])) {
+    c.fillStyle = 'rgba(224,62,62,.16)'; c.fillRect(g.x(K[i - 1].t), g.top, g.x(K[i].t) - g.x(K[i - 1].t), g.bot - g.top);
+  }
+  const h = g.bot - g.top - 8;
+  for (const j of JOINTS) {
+    const L = cfg.joints[j.id]; c.strokeStyle = JOINT_COLORS[j.id]; c.lineWidth = 1.6; c.beginPath();
+    info.samples.forEach((sm, i) => { const y = g.bot - 4 - (sm.q[j.id] - L.min) / (L.max - L.min) * h; i ? c.lineTo(g.x(sm.t), y) : c.moveTo(g.x(sm.t), y); });
+    c.stroke();
+  }
+  K.forEach((k, i) => {
+    const x = g.x(k.t), y = 11;
+    c.beginPath(); c.moveTo(x, y - 6); c.lineTo(x + 6, y); c.lineTo(x, y + 6); c.lineTo(x - 6, y); c.closePath();
+    c.fillStyle = i === anim.sel ? cssVar('--accent') : cssVar('--panel'); c.fill();
+    c.strokeStyle = k.move === 'line' ? cssVar('--blue') : cssVar('--text'); c.lineWidth = 1.5; c.stroke();
+  });
+  const px = g.x(anim.t);
+  c.strokeStyle = anim.rec ? cssVar('--danger') : cssVar('--text'); c.lineWidth = 2; c.beginPath(); c.moveTo(px, g.top - 4); c.lineTo(px, g.bot); c.stroke();
+}
+function setupTimeline() {
+  const cv = $('#timeline');
+  $('#legend').innerHTML = JOINTS.map(j => `<span><i style="background:${JOINT_COLORS[j.id]}"></i>${j.name}</span>`).join('') +
+    '<span>◆ keyframe (blue outline = straight line)</span>';
+  const scrub = t => { anim.t = clamp(t, 0, animDur(curAnim())); const p = animPose(curAnim(), anim.t); if (p) setPose(p.q, 'anim'); renderTransport(); };
+  cv.addEventListener('pointerdown', e => {
+    const g = tlGeom(), x = e.clientX - g.r.left, y = e.clientY - g.r.top, K = curAnim().keys;
+    stopAnim(); stopRec();
+    const hit = y < g.top ? K.findIndex(k => Math.abs(g.x(k.t) - x) < 8) : -1;
+    cv.setPointerCapture(e.pointerId);
+    if (hit > 0) { tl.drag = { key: K[hit], span: g.span }; anim.sel = hit; }
+    else { tl.drag = { scrub: true, span: g.span }; if (hit === 0) anim.sel = 0; scrub(g.t(x)); }
+  });
+  cv.addEventListener('pointermove', e => {
+    if (!tl.drag) return;
+    const g = tlGeom(), t = g.t(e.clientX - g.r.left);
+    if (tl.drag.scrub) scrub(t);
+    else { tl.drag.key.t = Math.max(0.05, Math.round(t * 20) / 20); anim.t = tl.drag.key.t; tl.drag.moved = true; renderTransport(); }
+  });
+  const up = () => {
+    if (!tl.drag) return;
+    const d = tl.drag; tl.drag = null;
+    if (d.key) { if (d.moved) { animChanged(); anim.sel = curAnim().keys.indexOf(d.key); } setPose(d.key.q, 'anim'); renderAnimUI(); }
+  };
+  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+}
+function updateAnimPath() {
+  if (!view.animPath) return;
+  const info = animInfo(), on = cfg.view.animPath && curAnim().keys.length > 1;
+  view.animPath.visible = view.animKeys.visible = on;
+  if (!on) return;
+  view.animPath.geometry.setFromPoints(info.samples.map(s => new THREE.Vector3(s.tip.x, s.tip.y, s.tip.z)));
+  view.animKeys.geometry.setFromPoints(curAnim().keys.map(k => { const p = fk(k.q).tip; return new THREE.Vector3(p.x, p.y, p.z); }));
+}
+function setupAnimEvents() {
+  setupTimeline();
+  $('#animSel').addEventListener('change', e => { stopAnim(true); stopRec(); cfg.animSel = +e.target.value; anim.sel = -1; saveCfg(); renderAnimUI(); updateAnimPath(); });
+  const named = (name, keys = []) => { cfg.anims.push({ name, loop: false, keys }); cfg.animSel = cfg.anims.length - 1; anim.sel = -1; anim.t = 0; animChanged(); };
+  $('#animNew').addEventListener('click', () => { const n = prompt('Name of the new animation', `Animation ${cfg.anims.length + 1}`); if (n) named(n.trim() || 'Animation'); });
+  $('#animDup').addEventListener('click', () => { const a = curAnim(); named(a.name + ' copy', structuredClone(a.keys)); });
+  $('#animRename').addEventListener('click', () => { const a = curAnim(), n = prompt('Rename animation', a.name); if (n && n.trim()) { a.name = n.trim(); saveCfg(); renderAnimUI(); } });
+  $('#animDel').addEventListener('click', () => {
+    const a = curAnim(); if (!confirm(`Delete “${a.name}”?`)) return;
+    stopAnim(true); cfg.anims.splice(cfg.animSel, 1); cfg.animSel = 0; anim.sel = -1; animChanged();
+  });
+  $('#animPlay').addEventListener('click', () => anim.playing ? stopAnim() : playAnim());
+  $('#animStop').addEventListener('click', () => { stopRec(); stopAnim(true); renderTransport(); });
+  $('#animRec').addEventListener('click', () => anim.rec ? stopRec() : startRec());
+  $('#animLoop').addEventListener('change', e => { curAnim().loop = e.target.checked; saveCfg(); });
+  $('#keyAdd').addEventListener('click', () => addKey(nextKeyTime(), state.target));
+  $('#keyInsert').addEventListener('click', () => addKey(anim.t, state.target));
+  $('#animExport').addEventListener('click', () => { const a = curAnim(); download(a.name.replace(/[^\w-]+/g, '_') + '.armctl.json', JSON.stringify({ armctlAnimation: 1, ...a }, null, 2), 'application/json'); });
+  $('#animImport').addEventListener('click', () => $('#animFile').click());
+  $('#animFile').addEventListener('change', async e => {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    try {
+      const d = JSON.parse(await f.text());
+      if (!Array.isArray(d.keys)) throw new Error('no keyframes in this file');
+      const keys = d.keys.map(k => ({ t: +k.t || 0, move: k.move === 'line' ? 'line' : 'joint', ease: k.ease === 'linear' ? 'linear' : 'smooth',
+        q: Object.fromEntries(JOINTS.map(j => [j.id, clamp(+k.q?.[j.id] || 0, cfg.joints[j.id].min, cfg.joints[j.id].max)])) }));
+      named(String(d.name || f.name.replace(/\.json$/, '')), keys); toast('Animation imported');
+    } catch (err) { toast('Could not import: ' + err.message); }
+  });
 }
 
 /* =====================================================================
@@ -1502,7 +1650,7 @@ function setEstop(on) {
   $('#estopBtn').classList.toggle('active', on);
   $('#estopBtn').textContent = on ? 'RESET STOP' : 'E-STOP';
   if (on) {
-    stopSeq(); prac.stop(false);
+    stopAnim(); stopRec(); prac.stop(false);
     state.target = { ...state.current }; refreshJointUI(); syncIkFromTarget();
     link.send({ t: 'off', estop: true });
     toast('E-STOP — servos released');
@@ -1537,7 +1685,7 @@ const prac = {
     if (state.estop) { toast('Release the E-stop first'); return; }
     if (live()) setMode('sim');
     if (live()) return;
-    stopSeq();
+    stopAnim(); stopRec();
     Object.assign(this, { active: true, kind, hits: 0, start: performance.now(), holdStart: 0, n: +$(kind === 'reach' ? '#pracReachN' : '#pracPoseN').value });
     this.next(); renderPrac();
   },
@@ -1854,15 +2002,17 @@ function onBind(p, el) {
     if (p === 'led.pin') bindAll($('#tab-pins')), bindAll($('#tab-leds'));
     ledChanged();
   }
-  if (p.startsWith('view.')) applyView();
+  if (p.startsWith('view.')) { applyView(); updateAnimPath(); }
   if (p.startsWith('sim.')) { if (p === 'sim.tolerance') updateTargets(); }
   if (p === 'safety.floor') ikRanges();
-  if (p.startsWith('conn.')) { updateConn(); connHint(); }
+  if (p.startsWith('conn.')) updateConn();
 }
 function connHint() {
-  $('#connHint').textContent = cfg.conn.transport === 'serial'
-    ? 'USB: plug the Pico into this computer. Works in Chrome/Edge on desktop. Close Thonny first — only one program can use the port.'
-    : `Wi-Fi: will connect to ${link.wsUrl()}. Leave the host empty when this page is served by the Pico itself.`;
+  const ok = 'serial' in navigator, t = $('#serialSupport');
+  t.textContent = ok ? 'Web Serial ready' : 'not supported here'; t.className = 'tag ' + (ok ? 'ok' : 'err');
+  $('#connHint').textContent = ok
+    ? 'Plug the Pico into this computer with a USB data cable and click “Connect USB”. Close Thonny first — only one program can use the port. Commands are only sent in Live mode.'
+    : 'This browser can’t talk to USB devices. Use Chrome or Edge on a computer (Windows, macOS, Linux, ChromeOS). The simulator works everywhere.';
 }
 
 /* =====================================================================
@@ -1942,6 +2092,11 @@ async function init3D() {
   view.trailGeo = new THREE.BufferGeometry();
   view.trail = new THREE.Line(view.trailGeo, new THREE.LineBasicMaterial({ color: 0xf26b1d }));
   view.trail.frustumCulled = false; root.add(view.trail); view.trailPts = [];
+  // animation path of the gripper + keyframe dots
+  view.animPath = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0x2f7cf6, transparent: true, opacity: 0.8 }));
+  view.animKeys = new THREE.Points(new THREE.BufferGeometry(), new THREE.PointsMaterial({ color: 0x2f7cf6, size: 7, sizeAttenuation: false }));
+  view.animPath.frustumCulled = view.animKeys.frustumCulled = false;
+  root.add(view.animPath, view.animKeys);
 
   rebuildModel();
   view.themeChanged = () => {
@@ -1960,20 +2115,32 @@ async function init3D() {
   ro.observe($('#viewer'));
   setCam('iso');
 
-  // Shift+click on the floor = IK target (x,y), keeps current z
-  let down = null;
-  canvas.addEventListener('pointerdown', e => { down = { x: e.clientX, y: e.clientY, shift: e.shiftKey }; });
-  canvas.addEventListener('pointerup', e => {
-    if (!down || !down.shift || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 5) { down = null; return; }
-    down = null;
-    const r = canvas.getBoundingClientRect();
-    const ndc = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
-    const rc = new THREE.Raycaster(); rc.setFromCamera(ndc, camera);
-    const hit = new THREE.Vector3();
-    if (rc.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hit)) {
-      state.ik.x = hit.x; state.ik.y = -hit.z; writeIkFields(); ikGo();
-    }
+  // Drag the blue ball = move the gripper with IK, on a plane facing the camera
+  const handle = new THREE.Mesh(new THREE.SphereGeometry(13, 16, 12), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }));
+  view.ikMarker.add(handle);
+  const rc = new THREE.Raycaster(), ndc = new THREE.Vector2(), plane = new THREE.Plane(), hit = new THREE.Vector3();
+  const ray = e => { const r = canvas.getBoundingClientRect(); ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); rc.setFromCamera(ndc, camera); };
+  const onHandle = e => { if (!view.ikMarker.visible) return false; ray(e); return rc.intersectObject(view.ikMarker, true).length > 0; };
+  let drag = null;
+  canvas.addEventListener('pointerdown', e => {               // capture phase: runs before OrbitControls
+    if (e.button !== 0 || !onHandle(e)) return;
+    e.stopImmediatePropagation(); controls.enabled = false; canvas.setPointerCapture(e.pointerId);
+    plane.setFromNormalAndCoplanarPoint(camera.getWorldDirection(new THREE.Vector3()), view.ikMarker.getWorldPosition(new THREE.Vector3()));
+    drag = { ok: true }; canvas.style.cursor = 'grabbing';
+  }, { capture: true });
+  canvas.addEventListener('pointermove', e => {
+    if (!drag) { canvas.style.cursor = onHandle(e) ? 'grab' : ''; return; }
+    ray(e);
+    if (!rc.ray.intersectPlane(plane, hit)) return;
+    const p = root.worldToLocal(hit.clone());
+    state.ik = { x: p.x, y: p.y, z: p.z }; writeIkFields(); drag.ok = ikGo(true);
   });
+  const end = () => {
+    if (!drag) return;
+    const ok = drag.ok; drag = null; controls.enabled = true; canvas.style.cursor = '';
+    if (!ok) syncIkFromTarget();                               // snap the ball back to the gripper
+  };
+  canvas.addEventListener('pointerup', end); canvas.addEventListener('pointercancel', end);
   view.ready = true;
 }
 function setCam(k) {
@@ -2168,7 +2335,7 @@ function updateWarnings() {
 /* =====================================================================
    Main loop
    ===================================================================== */
-let lastT = performance.now();
+let lastT = performance.now(), tlLast = 0;
 function tick(now) {
   const dt = Math.min(0.1, (now - lastT) / 1000); lastT = now;
   // keyboard: continuous joint / IK jogging
@@ -2190,16 +2357,18 @@ function tick(now) {
     for (const j of JOINTS) {
       const t = state.target[j.id], c = state.current[j.id];
       if (instant) state.current[j.id] = t;
-      else { const m = jointSpeed(j.id) * dt; state.current[j.id] = c + clamp(t - c, -m, m); }
+      else { const m = (anim.playing ? servoSpeed(j.id) : jointSpeed(j.id)) * dt; state.current[j.id] = c + clamp(t - c, -m, m); }
     }
   }
-  stepSeq(now);
+  stepAnim(dt);
+  stepRec(now);
   prac.tick(now);
   sendPositions(now);
   render3D(now);
   updateReadout(now);
   updateHud(now);
   renderLedPreview(now);
+  if (now - tlLast > 33 && $('#tab-anim').classList.contains('on')) { tlLast = now; drawTimeline(); if (anim.playing || anim.rec) renderTransport(); }
   requestAnimationFrame(tick);
 }
 
@@ -2213,15 +2382,8 @@ function download(name, text, type = 'text/plain') {
 function firmware() {
   const pk = cfgPacket(false), lp = ledPacket(false);
   const fwCfg = { servos: pk.servos, led: pk.led, fx: lp.fx };
-  const apPass = $('#fwApPass').value;
-  if (apPass.length < 8) { toast('Access-point password must be at least 8 characters'); return null; }
   if (pinProblems().msgs.length) { toast('Fix the pin conflicts first'); return null; }
   return $('#fwTemplate').textContent.replace(/^\n/, '')
-    .replace('{{SSID}}', () => JSON.stringify($('#fwSsid').value))
-    .replace('{{PASS}}', () => JSON.stringify($('#fwPass').value))
-    .replace('{{AP}}', () => $('#fwAp').checked || !$('#fwSsid').value ? 'True' : 'False')
-    .replace('{{AP_SSID}}', () => JSON.stringify($('#fwApSsid').value || 'ArmCtl-Pico'))
-    .replace('{{AP_PASS}}', () => JSON.stringify(apPass))
     .replace('{{CFG}}', () => JSON.stringify(fwCfg).replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
 }
 
@@ -2252,9 +2414,7 @@ function setupEvents() {
     cfg.poses.push({ name, q: snap(state.target) }); $('#poseName').value = ''; saveCfg(); renderPoses(); toast(`Saved “${name}”`);
   });
   $('#poseName').addEventListener('keydown', e => { if (e.key === 'Enter') $('#poseSave').click(); });
-  $('#seqPlay').addEventListener('click', playSeq);
-  $('#seqStop').addEventListener('click', stopSeq);
-  $('#seqClear').addEventListener('click', () => { stopSeq(); cfg.sequence = []; saveCfg(); renderSeq(); });
+  setupAnimEvents();
   // simulator
   $('#simEnter').addEventListener('click', () => setMode('sim'));
   $('#pracReach').addEventListener('click', () => prac.active && prac.kind === 'reach' ? prac.stop(false) : prac.begin('reach'));
@@ -2302,6 +2462,7 @@ function setupEvents() {
     clearTimeout(saveTimer); location.reload();
   });
   $('#logClear').addEventListener('click', () => $('#console').innerHTML = '');
+  $('#picoReset').addEventListener('click', () => { if (!link.connected) { toast('Not connected'); return; } link.raw('\x03\x03\x04'); log('Restarting main.py on the Pico…'); setTimeout(() => { link.send({ t: 'hello' }); link.send(cfgPacket(false)); link.send(ledPacket(false)); link.lastSent = ''; }, 1500); });
   $('#rawSend').addEventListener('click', () => {
     const v = $('#rawCmd').value.trim(); if (!v) return;
     try { if (!link.send(JSON.parse(v))) toast('Not connected'); } catch (e) { toast('Not valid JSON'); }
@@ -2315,6 +2476,8 @@ function setupEvents() {
     if (typing(e) || e.ctrlKey || e.metaKey || e.altKey) return;
     const k = e.key.toLowerCase();
     if (k === 'home') { e.preventDefault(); setPose(homePose()); return; }
+    if (k === ' ' && !e.repeat) { e.preventDefault(); anim.playing ? stopAnim() : playAnim(); return; }
+    if (k === 'k' && !e.repeat) { e.preventDefault(); addKey(nextKeyTime(), state.target); toast('Keyframe added'); return; }
     if (JOINTS.some(j => j.keys.includes(k)) || JOG_KEYS.includes(k)) {
       e.preventDefault();
       if (JOG_KEYS.includes(k) && !state.keys.has(k)) syncIkFromTarget();
@@ -2339,10 +2502,10 @@ function boot() {
   $('#speedVal').textContent = cfg.speed + ' %';
   applyTheme();
   renderMode();
-  renderPoses(); renderSeq(); renderPrac();
+  renderPoses(); renderAnimUI(); renderPrac();
   updateConn(); connHint();
   syncIkFromTarget();
-  init3D().then(() => applyView());
+  init3D().then(() => { applyView(); updateAnimPath(); });
   requestAnimationFrame(tick);
   log('ArmCtl ready. Mode: ' + cfg.mode);
 }
