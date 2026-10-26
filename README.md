@@ -4,12 +4,13 @@ A single-file web app (`index.html`) to control a 4-axis 3D-printed robotic arm 
 
 The arm is the "Robotic arm - brazo robótico" frame (8 printed parts): base, arm base, upper arm, forearm, gripper adapter, gripper base, gripper rack and gear.
 
-| Joint    | Servo | Default pin | Range     |
-|----------|-------|-------------|-----------|
-| Base     | MG90S | GP0         | −90…90°   |
-| Shoulder | MG90S | GP1         | −45…85°   |
-| Elbow    | MG90S | GP2         | −60…90°   |
-| Gripper  | MG90S | GP3         | 0…100 % (rack and pinion, ~21 mm jaw travel) |
+| Connection | Pico pin | Wire |
+|------------|----------|------|
+| Base servo (MG90S, −90…90°) | GP0 | Signal wire, orange or yellow |
+| Shoulder servo (MG90S, −45…85°) | GP2 | Signal wire |
+| Elbow servo (MG90S, −60…90°) | GP4 | Signal wire |
+| Gripper servo (MG90S, 0…100 %, ~21 mm jaw travel) | GP6 | Signal wire |
+| NeoPixel data (optional) | GP15 | Add a 330 Ω resistor in series with the data line |
 
 Pins and limits can be changed in the page.
 
@@ -66,9 +67,10 @@ Arm dimensions, measured between the servo shafts in the STL files: shoulder axi
 
 ## Wiring
 
-- Servo signal wires go to GP0–GP3, and the NeoPixel data line to GP16.
-- Power the servos from a separate 5 V supply (≥ 3 A), not from the Pico or USB.
-- Connect the supply's ground to a Pico GND pin.
+- **Servo signal wires** (orange or yellow): GP0 base, GP2 shoulder, GP4 elbow, GP6 gripper.
+- **Servo power:** red wires to +5 V and brown/black wires to ground, from a separate 5 V supply (≥ 3 A), not from the Pico or USB.
+- **Common ground:** connect the supply's ground to a Pico GND pin.
+- **NeoPixel (optional):** data line to GP15 through a 330 Ω resistor.
 
 ## USB protocol
 

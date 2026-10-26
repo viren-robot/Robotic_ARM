@@ -532,7 +532,8 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
           <li>Connect the servo supply ground to a Pico <b>GND</b> pin — the signal needs a common ground.</li>
           <li>GP23, GP24, GP25 and GP29 are used by the Pico W's wireless chip and can't be assigned.</li>
           <li>GPn and GPn+16 share one PWM output (e.g. GP0 &amp; GP16), so two servos can't use both.</li>
-          <li>NeoPixels run on PIO, so any free GPIO works. A 330 Ω resistor in the data line is recommended.</li>
+          <li>Servo wires: <b>orange/yellow</b> = signal (to the GPIO above), <b>red</b> = +5 V (servo supply), <b>brown/black</b> = ground.</li>
+          <li>NeoPixels (optional) run on PIO, so any free GPIO works. Put a 330 Ω resistor in series with the data line.</li>
         </ul>
       </div>
     </div>
@@ -1001,7 +1002,7 @@ const DEMO_ANIMS = (() => {
 })();
 const servoDefaults = (pin, type, extra = {}) => ({ pin, type, center: 90, invert: false, minAngle: 0, maxAngle: 180, minUs: 500, maxUs: 2500, range: 180, ...extra });
 const DEFAULT_CFG = {
-  version: 3,
+  version: 4,
   theme: 'auto',
   mode: 'sim',
   speed: 50,
@@ -1013,12 +1014,12 @@ const DEFAULT_CFG = {
   },
   servos: {
     base:     servoDefaults(0, 'MG90S'),
-    shoulder: servoDefaults(1, 'MG90S'),
-    elbow:    servoDefaults(2, 'MG90S'),
-    gripper:  servoDefaults(3, 'MG90S', { closedAngle: 40, openAngle: 130 }),
+    shoulder: servoDefaults(2, 'MG90S'),
+    elbow:    servoDefaults(4, 'MG90S'),
+    gripper:  servoDefaults(6, 'MG90S', { closedAngle: 40, openAngle: 130 }),
   },
   typeSpeed: { MG90S: 400 },
-  led: { enabled: true, type: 'WS2812B', pin: 16, count: 8, order: 'GRB', bpp: 3, khz: 800,
+  led: { enabled: true, type: 'WS2812B', pin: 15, count: 8, order: 'GRB', bpp: 3, khz: 800,
          mode: 'status', color1: '#0078ff', color2: '#ff0078', white: 0, brightness: 80, speed: 50 },
   conn: { rate: 30, autoReconnect: true, port: '' },   // port: 'VID:PID#n' of the chosen USB port
   view: { grid: true, envelope: true, axes: false, shadows: true, ikMarker: true, trail: false, animPath: true },
@@ -1045,6 +1046,12 @@ function loadCfg(saved) {
     if (saved.sequence?.length) saved.anims = [...structuredClone(DEMO_ANIMS), { name: 'My sequence', loop: !!saved.seqLoop,
       keys: saved.sequence.map((p, i) => ({ t: i * 1.5, q: p.q, move: 'joint', ease: 'smooth' })) }];
     for (const k of ['sequence', 'seqLoop', 'seqDwell']) delete saved[k];
+  }
+  if (v < 4) {                                   // v4: new default pins; move them only if they were never changed
+    const sv = saved.servos || {}, old = { base: 0, shoulder: 1, elbow: 2, gripper: 3 };
+    if (Object.entries(old).every(([k, pin]) => sv[k]?.pin === undefined || +sv[k].pin === pin))
+      for (const k of Object.keys(old)) if (sv[k]) sv[k].pin = DEFAULT_CFG.servos[k].pin;
+    if (saved.led && +saved.led.pin === 16) saved.led.pin = DEFAULT_CFG.led.pin;
   }
   delete saved.version;
   return merge(DEFAULT_CFG, saved);
@@ -2123,11 +2130,13 @@ function pinProblems() {
 function pinOptions(sel) { return PICO_PINS.map(p => `<option value="${p}"${+sel === p ? ' selected' : ''}>GP${p}</option>`).join(''); }
 function buildPins() {
   const t = $('#pinTable');
-  t.innerHTML = '<tr><th>Output</th><th>Type</th><th>GPIO</th><th>PWM</th><th></th></tr>' +
-    SERVOS.map(s => `<tr data-who="${esc(s.name)}"><td><b>${s.name}</b></td><td><span class="tag">${s.type}</span></td>
-      <td><select data-bind="servos.${s.id}.pin" data-num>${pinOptions(cfg.servos[s.id].pin)}</select></td><td class="mono small" data-pwm></td><td data-st></td></tr>`).join('') +
-    `<tr data-who="NeoPixel"><td><b>NeoPixel data</b></td><td><span class="tag" id="pinLedType"></span></td>
-      <td><select data-bind="led.pin" data-num>${pinOptions(cfg.led.pin)}</select></td><td class="mono small">PIO</td><td data-st></td></tr>`;
+  t.innerHTML = '<tr><th>Output</th><th>Type</th><th>GPIO</th><th>PWM</th><th>Wire</th><th></th></tr>' +
+    SERVOS.map(s => `<tr data-who="${esc(s.name)}"><td><b>${s.name} servo</b></td><td><span class="tag">${s.type}</span></td>
+      <td><select data-bind="servos.${s.id}.pin" data-num>${pinOptions(cfg.servos[s.id].pin)}</select></td><td class="mono small" data-pwm></td>
+      <td class="small muted">Signal wire (orange or yellow)</td><td data-st></td></tr>`).join('') +
+    `<tr data-who="NeoPixel"><td><b>NeoPixel data</b> <span class="small muted">(optional)</span></td><td><span class="tag" id="pinLedType"></span></td>
+      <td><select data-bind="led.pin" data-num>${pinOptions(cfg.led.pin)}</select></td><td class="mono small">PIO</td>
+      <td class="small muted">Data in, with a 330 Ω resistor in series</td><td data-st></td></tr>`;
   bindAll(t);
   $('#ledPin').innerHTML = pinOptions(cfg.led.pin);
   refreshPins();
