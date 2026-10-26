@@ -81,6 +81,7 @@ header { position: sticky; top: 0; z-index: 30; display: flex; align-items: cent
 .btn.sm { padding: 4px 8px; font-size: 12px; border-radius: 6px; }
 .btn.icon { width: 30px; height: 30px; padding: 0; }
 #themeBtn { width: 36px; height: 36px; font-size: 18px; }
+#portSel { max-width: 270px; }
 .estop { background: var(--danger); color: #fff; border: 0; font-weight: 800; letter-spacing: .05em; padding: 8px 16px; border-radius: 8px; cursor: pointer; box-shadow: 0 0 0 3px var(--danger-weak); }
 .estop.active { background: #fff; color: var(--danger); animation: blink 1s infinite; }
 @keyframes blink { 50% { box-shadow: 0 0 0 6px var(--danger-weak); } }
@@ -233,7 +234,8 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
     <button data-mode="live">Live</button>
   </div>
   <span class="pill" id="connPill"><span class="dot" id="connDot"></span><span id="connText">Disconnected</span></span>
-  <button class="btn" id="connBtn" title="Connect to the Pico over USB">Connect USB</button>
+  <select id="portSel" title="USB port the commands are sent to" aria-label="USB port"></select>
+  <button class="btn" id="connBtn" title="Connect to the selected USB port">Connect USB</button>
   <button class="btn icon" id="themeBtn" title="Theme: auto / light / dark"></button>
   <button class="estop" id="estopBtn" title="Emergency stop (Esc)">E-STOP</button>
 </header>
@@ -558,6 +560,10 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
           <label class="chk"><input type="checkbox" data-bind="safety.floor"> IK keeps the arm above the table</label>
         </div>
         <p class="small muted" id="connHint"></p>
+        <h4>Ports</h4>
+        <div class="list" id="portList"></div>
+        <div class="row" style="margin-top:8px"><button class="btn sm" id="portAdd">Add a port…</button>
+          <span class="small muted grow">The browser's port picker shows the COM / tty name (e.g. COM3). Web pages can't read that name, so ports here are listed by their USB vendor:product ID.</span></div>
       </div>
       <div class="card">
         <div class="head"><h3>Pico firmware (MicroPython)</h3></div>
@@ -911,7 +917,7 @@ const DEFAULT_CFG = {
   typeSpeed: { MG90S: 400 },
   led: { enabled: true, type: 'WS2812B', pin: 16, count: 8, order: 'GRB', bpp: 3, khz: 800,
          mode: 'status', color1: '#0078ff', color2: '#ff0078', white: 0, brightness: 80, speed: 50 },
-  conn: { rate: 30, autoReconnect: true },
+  conn: { rate: 30, autoReconnect: true, port: '' },   // port: 'VID:PID#n' of the chosen USB port
   view: { grid: true, envelope: true, axes: false, shadows: true, ikMarker: true, trail: false, animPath: true },
   sim: { realistic: true, ghost: false, tolerance: 12, poseTol: 8 },
   safety: { floor: true },
@@ -1114,12 +1120,10 @@ const link = {
     if (!('serial' in navigator)) { toast('USB needs Chrome or Edge on a computer'); log('Web Serial is not supported in this browser — use Chrome or Edge on Windows, macOS, Linux or ChromeOS.', 'er'); return; }
     this.connecting = true; updateConn();
     try {
-      if (!port) {
-        const picos = (await navigator.serial.getPorts()).filter(p => p.getInfo().usbVendorId === PICO_VID);
-        port = picos.length === 1 ? picos[0] : await navigator.serial.requestPort();
-      }
+      port ||= selectedPort() || await navigator.serial.requestPort();
       await port.open({ baudRate: 115200 });
       this.port = port; this.wantOpen = true;
+      await refreshPorts(); choosePort(port);
       this.writer = port.writable.getWriter();
       this.onOpen();
       this.readSerial();
@@ -1150,7 +1154,7 @@ const link = {
     this.send({ t: 'hello' });
     this.send(cfgPacket(false));
     this.send(ledPacket(false));
-    updateConn();
+    updateConn(); renderPorts();
   },
   async close(byUser = true) {
     if (byUser) this.wantOpen = false;
@@ -1161,7 +1165,7 @@ const link = {
       try { this.writer?.releaseLock(); } catch (e) {}
       try { await p.close(); } catch (e) {}
     }
-    this.writer = null; updateConn(); updateWarnings();
+    this.writer = null; updateConn(); updateWarnings(); renderPorts();
     if (was) log(byUser ? 'Disconnected' : 'USB connection lost', byUser ? '' : 'er');
   },
   raw(text) { if (this.writer) this.writer.write(new TextEncoder().encode(text)).catch(() => {}); },
@@ -1184,10 +1188,67 @@ const link = {
   },
 };
 if ('serial' in navigator) {
-  navigator.serial.addEventListener('connect', e => {
-    if (link.wantOpen && cfg.conn.autoReconnect && !link.connected) { log('Pico plugged in — reconnecting'); setTimeout(() => link.open(e.target), 800); }
+  navigator.serial.addEventListener('connect', async e => {
+    await refreshPorts();
+    if (link.wantOpen && cfg.conn.autoReconnect && !link.connected && portKey(e.target) === cfg.conn.port) {
+      log('Pico plugged back in — reconnecting'); setTimeout(() => link.open(e.target), 800);
+    }
   });
-  navigator.serial.addEventListener('disconnect', e => { if (e.target === link.port && link.connected) link.close(false); });
+  navigator.serial.addEventListener('disconnect', e => { if (e.target === link.port && link.connected) link.close(false); refreshPorts(); });
+}
+
+/* ---------- choosing the USB port ----------
+   Browsers only list ports this page was allowed to use, identified by USB vendor/product id (not by COM name). */
+const ports = { list: [], keys: [] };
+const hex4 = v => v == null ? '----' : v.toString(16).toUpperCase().padStart(4, '0');
+const portKey = p => ports.keys[ports.list.indexOf(p)] || '';
+function portName(p) {
+  const v = p.getInfo().usbVendorId, [id, n] = portKey(p).split('#');
+  const name = v === PICO_VID ? 'Raspberry Pi Pico' : v != null ? 'USB serial device' : 'Serial port';
+  return `${name}${v != null ? ` (${id})` : ''}${+n > 1 ? ` #${n}` : ''}`;
+}
+// The saved port if it is plugged in, otherwise the only available port
+const selectedPort = () => ports.list[ports.keys.indexOf(cfg.conn.port)] || (ports.list.length === 1 ? ports.list[0] : null);
+function choosePort(p) { const k = portKey(p); if (k && k !== cfg.conn.port) { cfg.conn.port = k; saveCfg(); } renderPorts(); }
+async function refreshPorts() {
+  if (!('serial' in navigator)) { renderPorts(); return; }
+  ports.list = await navigator.serial.getPorts();
+  const seen = {};
+  ports.keys = ports.list.map(p => { const i = p.getInfo(), id = `${hex4(i.usbVendorId)}:${hex4(i.usbProductId)}`; seen[id] = (seen[id] || 0) + 1; return `${id}#${seen[id]}`; });
+  renderPorts();
+}
+function renderPorts() {
+  const sel = $('#portSel'), cur = selectedPort(), ok = 'serial' in navigator;
+  sel.disabled = !ok;
+  sel.innerHTML = !ok ? '<option>USB not supported</option>'
+    : (ports.list.length ? '' : '<option value="">No port chosen</option>') +
+      ports.list.map((p, i) => `<option value="${ports.keys[i]}"${p === cur ? ' selected' : ''}>${esc(portName(p))}${p === link.port && link.connected ? ' ●' : ''}</option>`).join('') +
+      '<option value="__add">Choose another port…</option>';
+  const pl = $('#portList');
+  pl.innerHTML = ports.list.length ? '' : '<div class="empty">No ports allowed yet. Click “Add a port…” or “Connect USB”.</div>';
+  ports.list.forEach((p, i) => {
+    const el = document.createElement('div'); el.className = 'item' + (p === cur ? ' playing' : '');
+    el.innerHTML = `<span class="name">${esc(portName(p))}</span>
+      <span class="tag${p === link.port && link.connected ? ' ok' : ''}">${p === link.port && link.connected ? 'connected' : p === cur ? 'selected' : 'available'}</span>
+      <button class="btn sm" data-a="use"${p === cur ? ' disabled' : ''}>Use</button>
+      ${'forget' in p ? '<button class="btn sm ghost" data-a="forget" title="Remove this page\'s permission for the port">Forget</button>' : ''}`;
+    el.addEventListener('click', async e => {
+      const a = e.target.dataset.a;
+      if (a === 'use') switchPort(p);
+      if (a === 'forget') { if (p === link.port) await link.close(); await p.forget(); if (portKey(p) === cfg.conn.port) cfg.conn.port = ''; saveCfg(); await refreshPorts(); toast('Port forgotten'); }
+    });
+    pl.appendChild(el);
+  });
+}
+async function switchPort(p) {
+  choosePort(p);
+  if (link.port && link.port !== p && (link.connected || link.connecting)) { await link.close(); await link.open(p); }
+  toast('Commands go to ' + portName(p));
+}
+async function addPort() {
+  if (!('serial' in navigator)) { toast('USB needs Chrome or Edge on a computer'); return; }
+  try { const p = await navigator.serial.requestPort(); await refreshPorts(); await switchPort(p); }
+  catch (e) { renderPorts(); }                      // picker cancelled
 }
 const live = () => cfg.mode === 'live';
 function cfgPacket(save) {
@@ -2401,6 +2462,12 @@ function setupEvents() {
   // header
   $$('#modeSeg button').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
   $('#connBtn').addEventListener('click', () => (link.connected || link.connecting) ? link.close() : link.open());
+  $('#portSel').addEventListener('change', e => {
+    const v = e.target.value;
+    if (v === '__add') addPort();
+    else { const p = ports.list[ports.keys.indexOf(v)]; if (p) switchPort(p); }
+  });
+  $('#portAdd').addEventListener('click', addPort);
   $('#themeBtn').addEventListener('click', () => { cfg.theme = { auto: 'light', light: 'dark', dark: 'auto' }[cfg.theme]; saveCfg(); applyTheme(); });
   $$('#themeSeg button').forEach(b => b.addEventListener('click', () => { cfg.theme = b.dataset.theme; saveCfg(); applyTheme(); }));
   $('#estopBtn').addEventListener('click', () => setEstop(!state.estop));
@@ -2503,7 +2570,7 @@ function boot() {
   applyTheme();
   renderMode();
   renderPoses(); renderAnimUI(); renderPrac();
-  updateConn(); connHint();
+  updateConn(); connHint(); refreshPorts();
   syncIkFromTarget();
   init3D().then(() => { applyView(); updateAnimPath(); });
   requestAnimationFrame(tick);
