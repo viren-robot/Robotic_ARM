@@ -79,6 +79,11 @@ header { position: sticky; top: 0; z-index: 30; display: flex; align-items: cent
 .btn.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
 .btn.ghost { background: transparent; }
 .btn.sm { padding: 4px 8px; font-size: 12px; border-radius: 6px; }
+.fwbar { height: 8px; border-radius: 4px; background: var(--panel2); border: 1px solid var(--border); overflow: hidden; min-width: 80px; }
+.fwbar > div { height: 100%; width: 0; background: var(--accent); transition: width .15s; }
+#fwStatus:empty { display: none; }
+#fwStatus.er { color: var(--danger); }
+#fwStatus.ok { color: var(--ok); }
 .btn.icon { width: 30px; height: 30px; padding: 0; }
 #themeBtn { width: 36px; height: 36px; font-size: 18px; }
 #portSel { max-width: 270px; }
@@ -456,7 +461,7 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
       </div>
       <div class="card">
         <div class="head"><h3>On the Arduino</h3><span class="tag" id="fwSafeTag"></span></div>
-        <p class="small muted">These run inside <code>armctl.ino</code> on the Uno, so they protect the arm even if the page, the browser or the USB cable misbehaves. They're sent to the Uno when you connect. After updating this page, upload <code>armctl.ino</code> again (Settings).</p>
+        <p class="small muted">These run inside <code>armctl.ino</code> on the Uno, so they protect the arm even if the page, the browser or the USB cable misbehaves. They're sent to the Uno when you connect. After updating this page, upload the firmware again (Settings → Upload to Arduino).</p>
         <div class="grid3">
           <label class="field"><span>Arduino speed limit (°/s)</span><input type="number" min="30" max="1000" step="10" data-bind="safety.fwSlew"></label>
           <label class="field"><span>Hold if no commands for (s)</span><input type="number" min="0.5" max="30" step="0.5" data-bind="safety.timeout"></label>
@@ -606,15 +611,28 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
           <span class="small muted grow">The browser's port picker shows the COM / tty name (e.g. COM3). Web pages can't read that name, so ports here are listed by their USB vendor:product ID.</span></div>
       </div>
       <div class="card">
-        <div class="head"><h3>Arduino firmware (armctl.ino)</h3></div>
-        <p class="small muted">Generates an Arduino sketch that talks to this page over USB, using your current pin, LED and safety settings.</p>
+        <div class="head"><h3>Arduino firmware</h3><span class="tag" id="fwTag"></span></div>
+        <p class="small muted">The Uno needs the ArmCtl firmware once (and again after this page is updated). This page uploads it by itself over USB — no Arduino IDE needed. Your current pins, limits and LED settings are built into it.</p>
         <ol class="small" style="margin:6px 0;padding-left:18px">
-          <li>Install the <b>Arduino IDE</b> (arduino.cc). If you use NeoPixels, also install the <b>Adafruit NeoPixel</b> library (Sketch → Include Library → Manage Libraries).</li>
-          <li>Download <code>armctl.ino</code> and open it in the Arduino IDE (let it create the “armctl” folder).</li>
-          <li>Tools → Board → <b>Arduino Uno</b>, Tools → Port → your Uno, then click <b>Upload</b>.</li>
-          <li>Close the IDE's Serial Monitor (only one program can use the port), then click <b>Connect USB</b> here.</li>
+          <li>Plug in the Uno and close the Arduino IDE's Serial Monitor (only one program can use the port).</li>
+          <li>Click <b>Upload to Arduino</b> and pick the Uno's port if asked. It takes a few seconds; the servos go limp meanwhile, so support the arm.</li>
+          <li>The page connects to the Uno when the upload is done.</li>
         </ol>
-        <div class="row end"><button class="btn sm primary" id="fwDownload">Download armctl.ino</button></div>
+        <div class="row">
+          <button class="btn sm primary" id="fwFlash">Upload to Arduino</button>
+          <div class="fwbar grow" id="fwBar" hidden><div></div></div>
+        </div>
+        <p class="small" id="fwStatus" aria-live="polite"></p>
+        <details class="small">
+          <summary>Use the Arduino IDE instead</summary>
+          <ol style="margin:6px 0;padding-left:18px">
+            <li>Install the <b>Arduino IDE</b> (arduino.cc). If you use NeoPixels, also install the <b>Adafruit NeoPixel</b> library (Sketch → Include Library → Manage Libraries).</li>
+            <li>Download <code>armctl.ino</code> and open it in the Arduino IDE (let it create the “armctl” folder).</li>
+            <li>Tools → Board → <b>Arduino Uno</b>, Tools → Port → your Uno, then click <b>Upload</b>.</li>
+            <li>Close the IDE's Serial Monitor, then click <b>Connect USB</b> here.</li>
+          </ol>
+          <div class="row end"><button class="btn sm" id="fwDownload">Download armctl.ino</button></div>
+        </details>
         <p class="small muted">The 3D view loads three.js from the internet; without internet the page falls back to a 2D schematic view.</p>
       </div>
       <div class="card">
@@ -679,8 +697,8 @@ struct Config {
   char ledOrder[5];              // colour order, e.g. "GRB" or "GRBW"
   uint8_t fx[11];                // effect, colour 1 (r g b w), colour 2 (r g b w), brightness, speed
 };
-const uint16_t MAGIC = {{MAGIC}};      // changes with every download, so a new upload ignores old EEPROM settings
 // Settings from the page. Settings saved from the page into EEPROM replace these.
+// The first number is a tag that changes with the settings, so a new upload ignores old EEPROM settings.
 Config cfg = {{CFG}};
 
 Servo servo[NSERVO];
@@ -932,7 +950,7 @@ void setup() {
   Serial.begin(115200);
   Config saved;
   EEPROM.get(0, saved);
-  if (saved.magic == MAGIC) cfg = saved;
+  if (saved.magic == cfg.magic) cfg = saved;
 #if USE_NEOPIXEL
   setupLeds();
 #endif
@@ -961,6 +979,8 @@ void loop() {
 #endif
 }
 </script>
+<!-- Ready-made armctl firmware for "Upload to Arduino", built from the template above by tools/build-firmware.js -->
+<script type="application/json" id="fwImages">{"fw":"armctl-uno-1.0","src":"b7486b13","built":"2026-10-30","neopixel":{"0":{"size":8820,"cfgAt":8747,"data":"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"},"1":{"size":14240,"cfgAt":14151,"data":"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"}}}</script>
 
 <script type="module">
 /* =====================================================================
@@ -1306,6 +1326,13 @@ function encode(m) {
   }
   return null;
 }
+let flashing = false;          // the firmware is being uploaded (Settings)
+const fwImages = (() => { try { return JSON.parse($('#fwImages').textContent); } catch (e) { return {}; } })();
+if (fwImages.src) {             // tools/build-firmware.js stores a hash of the sketch it compiled
+  const t = $('#fwTemplate').textContent.replace(/^\n/, '');
+  let h = 0x811c9dc5; for (let i = 0; i < t.length; i++) h = Math.imul(h ^ t.charCodeAt(i), 0x01000193) >>> 0;
+  if (h.toString(16).padStart(8, '0') !== fwImages.src) console.warn('The built-in firmware is older than the sketch in #fwTemplate — run tools/build-firmware.js');
+}
 const link = {
   port: null, reader: null, writer: null, connected: false, connecting: false, booting: false, bootTimer: 0,
   wantOpen: false, lastPong: 0, rtt: null, lastSent: '', lastSendT: 0, fw: '', silentWarned: false,
@@ -1401,7 +1428,7 @@ const link = {
   onLine(line) {
     let m; try { m = JSON.parse(line); } catch (e) {
       log('« ' + line);
-      if (/[\x00-\x08\ufffd]/.test(line)) log('Garbled data from the board: upload armctl.ino from Settings (it uses 115200 baud).', 'er');
+      if (/[\x00-\x08\ufffd]/.test(line)) log('Garbled data from the board: click “Upload to Arduino” in Settings (the firmware uses 115200 baud).', 'er');
       return;
     }
     if (m.t === 'ready') {
@@ -1414,9 +1441,9 @@ const link = {
     }
     if (m.t === 'pong') { this.lastPong = performance.now(); this.rtt = Math.round(performance.now() - (m.id || 0)); this.silentWarned = false; updateConn(); return; }
     if (m.t === 'hello') {
-      this.fw = m.fw || ''; renderSafety();
-      if (!isUnoFw(this.fw)) safetyEvent('This board isn’t running armctl.ino — upload it from Settings with the Arduino IDE.', true);
-      if (!m.neopixel && cfg.led.enabled) log('The sketch on the Uno was made with NeoPixels off — download armctl.ino again to use the LEDs.', 'er');
+      this.fw = m.fw || ''; renderSafety(); renderFwTag();
+      if (!isUnoFw(this.fw)) safetyEvent('This board isn’t running the ArmCtl firmware — click “Upload to Arduino” in Settings.', true);
+      if (!m.neopixel && cfg.led.enabled) log('The firmware on the Uno was made with NeoPixels off — click “Upload to Arduino” in Settings again to use the LEDs.', 'er');
     }
     log('← ' + line, 'rx');
   },
@@ -1509,8 +1536,10 @@ function ledPacket(save) {
 function updateConn() {
   const dot = $('#connDot'), txt = $('#connText'), btn = $('#connBtn');
   dot.className = 'dot' + (link.connected && !link.booting ? ' ok' : link.connecting || link.booting ? ' warn' : '');
-  txt.textContent = link.booting ? 'Arduino starting…' : link.connected ? `USB connected${link.rtt != null ? ' · ' + link.rtt + ' ms' : ''}` : link.connecting ? 'Connecting…' : 'Disconnected';
+  txt.textContent = flashing ? 'Uploading firmware…' : link.booting ? 'Arduino starting…' : link.connected ? `USB connected${link.rtt != null ? ' · ' + link.rtt + ' ms' : ''}` : link.connecting ? 'Connecting…' : 'Disconnected';
   btn.textContent = link.connected || link.connecting ? 'Disconnect' : 'Connect USB';
+  btn.disabled = flashing;
+  renderFwTag();
 }
 // keep-alive + latency
 setInterval(() => {
@@ -1518,7 +1547,7 @@ setInterval(() => {
   link.send({ t: 'ping', id: Math.round(performance.now()) });
   if (performance.now() - link.lastPong > 6000 && !link.silentWarned) {
     link.silentWarned = true;
-    log('No reply from the Arduino — is armctl.ino uploaded to it? Try "Restart Arduino" in Settings.', 'er');
+    log('No reply from the Arduino — is the ArmCtl firmware on it? Click “Upload to Arduino” in Settings, or try “Restart Arduino”.', 'er');
   }
 }, 2000);
 
@@ -2018,7 +2047,7 @@ function sendCfgSoon() { clearTimeout(cfgSendT); cfgSendT = setTimeout(() => { i
 const fwHasSafety = () => link.connected && isUnoFw(link.fw);
 function renderSafety() {
   const S = cfg.safety, J = cfg.joints, on = (b, a = 'On', o = 'Off') => `<span class="tag ${b ? 'ok' : 'err'}">${b ? a : o}</span>`;
-  const fw = !link.connected ? '<span class="tag">Not connected</span>' : fwHasSafety() ? on(true, 'Active on Arduino') : '<span class="tag err">Upload armctl.ino</span>';
+  const fw = !link.connected ? '<span class="tag">Not connected</span>' : fwHasSafety() ? on(true, 'Active on Arduino') : '<span class="tag err">Upload the firmware</span>';
   const rows = [
     ['Joint limits', JOINTS.map(j => `${j.name} ${J[j.id].min}…${J[j.id].max}${j.unit}`).join(' · '), on(true)],
     ['Collision guard', `Table (${S.floorMargin} mm clearance), base, shoulder and upper arm`, on(S.collide)],
@@ -2034,7 +2063,7 @@ function renderSafety() {
   const st = $('#safeState'), off = !S.collide;
   st.textContent = off ? 'collision guard off' : 'protected'; st.className = 'tag ' + (off ? 'err' : 'ok');
   const ft = $('#fwSafeTag');
-  ft.textContent = !link.connected ? 'Not connected' : fwHasSafety() ? 'Active on Arduino' : 'Upload armctl.ino';
+  ft.textContent = !link.connected ? 'Not connected' : fwHasSafety() ? 'Active on Arduino' : 'Upload the firmware';
   ft.className = 'tag' + (fwHasSafety() ? ' ok' : link.connected ? ' err' : '');
 }
 
@@ -2758,18 +2787,177 @@ function download(name, text, type = 'text/plain') {
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name;
   document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
 }
-function firmware() {
+// The settings built into the firmware (same order as `struct Config` in the sketch)
+function fwSettings() {
   if (pinProblems().errors) { toast('Fix the pin conflicts first'); return null; }
   const pk = cfgPacket(false), f = ledPacket(false).fx, L = pk.led;
-  const servos = pk.servos.map(s => `{${s.pin}, ${s.min}, ${s.max}, ${s.slew}}`).join(', ');
-  const fx = [Math.max(0, LED_MODES.indexOf(f.mode)), ...f.c1, ...f.c2, f.bri, f.speed].join(', ');
-  const body = `${pk.timeout}, { ${servos} }, ${L.pin}, ${L.count}, ${L.bpp}, ${L.timing}, "${L.order.replace(/[^RGBW]/g, '')}", { ${fx} }`;
-  let h = 0x5A17; for (const ch of body) h = (h * 31 + ch.charCodeAt(0)) & 0xffff;      // EEPROM tag for exactly these settings
-  const magic = '0x' + h.toString(16).toUpperCase().padStart(4, '0');
+  const st = { timeout: pk.timeout, servos: pk.servos.map(({ pin, min, max, slew }) => ({ pin, min, max, slew })),
+    ledPin: L.pin, ledCount: L.count, ledBpp: L.bpp, ledKhz800: L.timing, order: L.order.replace(/[^RGBW]/g, ''),
+    fx: [Math.max(0, LED_MODES.indexOf(f.mode)), ...f.c1, ...f.c2, f.bri, f.speed] };
+  st.body = `${st.timeout}, { ${st.servos.map(s => `{${s.pin}, ${s.min}, ${s.max}, ${s.slew}}`).join(', ')} }, ` +
+    `${st.ledPin}, ${st.ledCount}, ${st.ledBpp}, ${st.ledKhz800}, "${st.order}", { ${st.fx.join(', ')} }`;
+  let h = 0x5A17; for (const ch of st.body) h = (h * 31 + ch.charCodeAt(0)) & 0xffff;      // EEPROM tag for exactly these settings
+  st.magic = h;
+  return st;
+}
+function firmware() {
+  const st = fwSettings(); if (!st) return null;
+  const magic = '0x' + st.magic.toString(16).toUpperCase().padStart(4, '0');
   return $('#fwTemplate').textContent.replace(/^\n/, '')
     .replace('{{USE_NEOPIXEL}}', cfg.led.enabled ? '1' : '0')
-    .replace('{{MAGIC}}', magic)
-    .replace('{{CFG}}', `{ ${magic}, ${body} }`);
+    .replace('{{CFG}}', `{ ${magic}, ${st.body} }`);
+}
+
+/* ---------- ready-made firmware, uploaded from the page ----------
+   #fwImages holds armctl compiled for the Uno (NeoPixels off and on) by tools/build-firmware.js.
+   The settings sit at a known place in the image (cfgAt) and are replaced by yours before uploading. */
+function fwConfigBytes(st) {   // struct Config on the AVR: no padding, little-endian
+  const b = [], u8 = v => b.push(clamp(Math.round(+v) || 0, 0, 255)), u16 = v => { v = clamp(Math.round(+v) || 0, 0, 65535); b.push(v & 255, v >> 8); };
+  u16(st.magic); u16(st.timeout);
+  for (const s of st.servos) { u8(s.pin); u16(s.min); u16(s.max); u16(s.slew); }
+  u8(st.ledPin); u8(st.ledCount); u8(st.ledBpp); u8(st.ledKhz800);
+  for (let i = 0; i < 5; i++) b.push(i < 4 ? st.order.charCodeAt(i) || 0 : 0);
+  st.fx.forEach(u8);
+  return Uint8Array.from(b);
+}
+function fwImage() {
+  const st = fwSettings(); if (!st) return null;
+  const im = fwImages.neopixel?.[cfg.led.enabled ? 1 : 0];
+  if (!im) { toast('This copy of the page has no built-in firmware — use “Download armctl.ino”'); return null; }
+  const bin = Uint8Array.from(atob(im.data), c => c.charCodeAt(0)), cb = fwConfigBytes(st);
+  if (cb.length !== 52) throw new Error('settings size');
+  bin.set(cb, im.cfgAt);
+  return bin;
+}
+
+// STK500 v1: what the Uno's bootloader (Optiboot) speaks for a moment after every reset
+class Stk500 {
+  constructor(port) { this.port = port; this.buf = []; this.wake = null; this.closed = false; }
+  async open(baud) {
+    await this.port.open({ baudRate: baud, bufferSize: 4096 });
+    this.writer = this.port.writable.getWriter(); this.reader = this.port.readable.getReader(); this.closed = false;
+    this.pump();
+  }
+  async pump() {
+    try { while (true) { const { value, done } = await this.reader.read(); if (done) break; for (const v of value) this.buf.push(v); this.wake?.(); } }
+    catch (e) {}
+    this.closed = true; this.wake?.();
+  }
+  async read(n, ms) {
+    const end = performance.now() + ms;
+    while (this.buf.length < n) {
+      const left = end - performance.now();
+      if (left <= 0 || this.closed) return null;
+      await new Promise(r => { this.wake = r; setTimeout(r, left); });
+      this.wake = null;
+    }
+    return this.buf.splice(0, n);
+  }
+  write(bytes) { return this.writer.write(Uint8Array.from(bytes)); }
+  async cmd(bytes, n = 0, ms = 500) {           // every command ends with CRC_EOP (0x20); answer: INSYNC (0x14) … OK (0x10)
+    await this.write([...bytes, 0x20]);
+    const r = await this.read(n + 2, ms);
+    if (!r) throw new Error('the bootloader stopped answering');
+    if (r[0] !== 0x14 || r[n + 1] !== 0x10) throw new Error('unexpected answer from the bootloader');
+    return r.slice(1, n + 1);
+  }
+  async reset() {                               // DTR pulse, like the Arduino IDE: the Uno restarts into its bootloader
+    await this.port.setSignals({ dataTerminalReady: false, requestToSend: false });
+    await sleep(250);
+    await this.port.setSignals({ dataTerminalReady: true, requestToSend: true });
+    await sleep(50);
+  }
+  async sync() {                                // the bootloader only waits about a second after the reset
+    for (let i = 0; i < 10; i++) {
+      this.buf.length = 0;
+      await this.write([0x30, 0x20]);
+      const r = await this.read(2, 150);
+      if (r && r[0] === 0x14 && r[1] === 0x10) { await sleep(30); this.buf.length = 0; return true; }
+    }
+    return false;
+  }
+  async close() {
+    try { await this.reader?.cancel(); } catch (e) {}
+    try { this.reader?.releaseLock(); } catch (e) {}
+    try { this.writer?.releaseLock(); } catch (e) {}
+    try { await this.port.close(); } catch (e) {}
+  }
+}
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function flashUno(port, image, progress) {
+  const PAGE = 128;                             // ATmega328P flash page
+  const stk = new Stk500(port);
+  let synced = false;
+  for (const baud of [115200, 57600]) {         // Uno (Optiboot) / boards with the old bootloader
+    await stk.open(baud);
+    await stk.reset();
+    synced = await stk.sync();
+    if (synced) break;
+    await stk.close();
+  }
+  if (!synced) throw new Error('NOSYNC');
+  try {
+    const sig = await stk.cmd([0x75], 3);
+    if (sig[0] !== 0x1E || sig[1] !== 0x95) throw new Error('This board is not an Arduino Uno (ATmega328P) — chip signature ' + sig.map(v => v.toString(16).padStart(2, '0')).join(' '));
+    await stk.cmd([0x50]);                      // enter programming mode
+    const pages = Math.ceil(image.length / PAGE);
+    const addr = a => stk.cmd([0x55, (a >> 1) & 255, a >> 9]);         // word address
+    for (let p = 0; p < pages; p++) {
+      const a = p * PAGE, data = new Uint8Array(PAGE).fill(0xFF);
+      data.set(image.subarray(a, a + PAGE));
+      await addr(a);
+      await stk.cmd([0x64, 0, PAGE, 0x46, ...data], 0, 1000);           // program page ('F' = flash)
+      progress(0.85 * (p + 1) / pages, 'Writing');
+    }
+    for (let p = 0; p < pages; p++) {                                   // read it back
+      const a = p * PAGE, n = Math.min(PAGE, image.length - a);
+      await addr(a);
+      const got = await stk.cmd([0x74, 0, PAGE, 0x46], PAGE, 1000);
+      for (let i = 0; i < n; i++) if (got[i] !== image[a + i]) throw new Error(`Verify failed at byte ${a + i} — try again`);
+      progress(0.85 + 0.15 * (p + 1) / pages, 'Checking');
+    }
+    await stk.cmd([0x51]);                      // leave programming mode: the new firmware starts
+  } finally { await stk.close(); }
+}
+
+async function uploadFirmware() {
+  if (flashing) return;
+  if (!('serial' in navigator)) { toast('Uploading needs Chrome or Edge on a computer'); return; }
+  const image = fwImage(); if (!image) return;
+  const st = $('#fwStatus'), bar = $('#fwBar'), btn = $('#fwFlash');
+  const status = (t, c = '') => { st.textContent = t; st.className = 'small ' + c; };
+  let port = link.port || selectedPort();
+  if (!port) { try { port = await navigator.serial.requestPort(); await refreshPorts(); choosePort(port); } catch (e) { return; } }
+  flashing = true; btn.disabled = true; bar.hidden = false; updateConn(); bar.firstElementChild.style.width = '0';
+  stopAnim(); stopRec();
+  if (link.connected || link.connecting) await link.close();
+  updateConn();
+  const t0 = performance.now();
+  status('Restarting the Arduino into its bootloader…');
+  log(`Uploading ${fwImages.fw} (${image.length} bytes, NeoPixels ${cfg.led.enabled ? 'on' : 'off'}) to ${portName(port)}…`);
+  try {
+    await flashUno(port, image, (f, what) => { bar.firstElementChild.style.width = (f * 100).toFixed(1) + '%'; status(`${what}… ${Math.round(f * 100)}%`); });
+    const secs = ((performance.now() - t0) / 1000).toFixed(1);
+    status(`Firmware uploaded and checked in ${secs} s.`, 'ok'); log(`Firmware uploaded and checked (${secs} s)`, 'rx');
+    toast('Firmware uploaded — connecting');
+    await sleep(300);
+    await link.open(port);
+  } catch (e) {
+    let msg = e.message;
+    if (e.message === 'NOSYNC') msg = 'The Arduino didn’t answer. Check that this is the Uno’s port and that no other program (like the Serial Monitor) has it open. If it still fails, press the Uno’s reset button right after clicking Upload.';
+    else if (e.name === 'NetworkError' || e.name === 'InvalidStateError') msg = 'Couldn’t open the port — close the Arduino IDE’s Serial Monitor or any other program using it.';
+    status('Upload failed: ' + msg, 'er'); log('Upload failed: ' + msg, 'er'); toast('Upload failed');
+  } finally {
+    flashing = false; btn.disabled = false; updateConn(); setTimeout(() => { if (!flashing) bar.hidden = true; }, 1500);
+    renderFwTag();
+  }
+}
+function renderFwTag() {
+  const tag = $('#fwTag'); if (!tag) return;
+  const on = link.connected && link.fw;
+  tag.textContent = on ? 'on the Uno: ' + link.fw : fwImages.fw ? 'built in: ' + fwImages.fw : 'not built in';
+  tag.className = 'tag' + (on && isUnoFw(link.fw) ? ' ok' : '');
 }
 
 /* =====================================================================
@@ -2839,6 +3027,7 @@ function setupEvents() {
     link.send(cfgPacket(true)); link.send(ledPacket(true)); toast('LED settings sent and saved on the Arduino');
   });
   // settings
+  $('#fwFlash').addEventListener('click', uploadFirmware);
   $('#fwDownload').addEventListener('click', () => { const t = firmware(); if (t) { download('armctl.ino', t, 'text/plain'); toast('armctl.ino downloaded — open it in the Arduino IDE and upload'); } });
   $('#cfgExport').addEventListener('click', () => download('armctl-settings.json', JSON.stringify(cfg, null, 2), 'application/json'));
   $('#cfgImport').addEventListener('click', () => $('#cfgFile').click());

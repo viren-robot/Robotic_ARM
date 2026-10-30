@@ -36,13 +36,14 @@ Pins and limits can be changed in the page. Any of D2–D13 and A0–A5 can be u
   - **Joint limits** and calibrated servo **min/max angles** are never exceeded.
   - **Smooth motion**: speed and acceleration limits.
   - **Animation check**: animations with red segments (too fast, unreachable, collision) can't play on the real arm.
-  - **On the Arduino** (`armctl.ino`):
+  - **On the Arduino** (the ArmCtl firmware):
     - Every pulse is clamped to the servo's range.
     - A speed limit applies even if the page sends a jump.
     - The Arduino holds position if commands stop (USB unplugged, page closed).
     - **E-STOP** freezes the arm in place (or optionally releases the servos).
   - **Power check**: the page warns if the Uno restarts by itself, which almost always means the servos are powered from the Uno.
 - **Calibration** of servo centres, directions, limits and home pose. **Pin assignments** with a pinout diagram. **NeoPixel** LED control.
+- **Firmware upload from the page**: one click writes the firmware to the Uno over USB, no Arduino IDE needed.
 - **E-STOP** button (or press `Esc`). Light and dark themes. Works on phones (simulator only: phones have no Web Serial).
 
 Arm dimensions, measured between the servo shafts in the STL files: shoulder axis 61 mm above the table, upper arm 81 mm, elbow to gripper tool point 121 mm (≈ 200 mm reach).
@@ -50,9 +51,9 @@ Arm dimensions, measured between the servo shafts in the STL files: shoulder axi
 ## Quick start
 
 1. Open `index.html` in **Chrome or Edge** on a computer. It starts in **Simulator** mode. Try the Animate tab.
-2. Install the **Arduino IDE**. If you want NeoPixels, also install the **Adafruit NeoPixel** library (Sketch → Include Library → Manage Libraries).
-3. In the page, go to **Settings → Arduino firmware** and click **Download armctl.ino**. Open it in the Arduino IDE (let it create the `armctl` folder), choose **Tools → Board → Arduino Uno** and your port, and click **Upload**.
-4. Close the IDE's Serial Monitor, click **Connect USB** in the page, pick the Uno, and switch to **Live**. The Uno restarts when the page connects; the page waits about 2 seconds for it.
+2. Plug in the Uno, go to **Settings → Arduino firmware** and click **Upload to Arduino**. The page writes the firmware to the Uno over USB in a few seconds (no Arduino IDE needed), checks it, and connects. Your pins, limits and LED settings are built in.
+3. Switch to **Live**. Next time, just click **Connect USB**: the Uno restarts when the page connects, and the page waits about 2 seconds for it.
+4. Prefer the Arduino IDE? Open "Use the Arduino IDE instead" in the same card and download `armctl.ino` (for NeoPixels, also install the **Adafruit NeoPixel** library). Upload it with **Tools → Board → Arduino Uno**, then close the Serial Monitor before connecting.
 5. Calibrate each servo in the **Calibration** tab. Ideally do this before fitting the horns: drive the servo to its center, then fit the horn with the joint at its zero position.
 
 ## Keyboard
@@ -72,6 +73,19 @@ Arm dimensions, measured between the servo shafts in the STL files: shoulder axi
 - **Servo power:** red wires to +5 V and brown/black wires to ground, from a separate 5 V supply (≥ 3 A). Not from the Uno's 5V pin or USB: the Uno would brown out and restart.
 - **Common ground:** connect the supply's ground to a GND pin on the Uno.
 - **NeoPixel (optional):** data line to D7 through a 330 Ω resistor. At most 60 LEDs (the Uno has 2 KB of RAM).
+
+## Built-in firmware uploader
+
+The page holds the firmware already compiled for the Uno (NeoPixels off and on), in `<script id="fwImages">`. **Upload to Arduino** fills in your settings, restarts the Uno into its bootloader (DTR pulse, like the Arduino IDE), and writes and reads back the flash with the STK500 protocol that the Uno's Optiboot bootloader speaks (115200 baud, with 57600 as a fallback for the old bootloader).
+
+After changing the sketch template (`<script id="fwTemplate">` in `index.html`), rebuild the images. This needs `avr-gcc`, `avr-libc`, the Arduino AVR core and the Servo and Adafruit NeoPixel libraries:
+
+```sh
+sudo apt install gcc-avr avr-libc arduino-core-avr
+git clone --branch 1.2.2 https://github.com/arduino-libraries/Servo
+git clone --branch 1.12.3 https://github.com/adafruit/Adafruit_NeoPixel
+node tools/build-firmware.js --servo Servo --neopixel Adafruit_NeoPixel
+```
 
 ## USB protocol
 
