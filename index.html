@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>ArmCtl — Pico W Robotic Arm</title>
+<title>ArmCtl — Arduino Robotic Arm</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23f26b1d'/%3E%3Cpath d='M16 50h20M26 50V34l12-14 10 6' stroke='white' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <script>
   // Apply saved theme before first paint (avoids a flash of the wrong theme)
@@ -227,7 +227,7 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
 <header>
   <div class="brand">
     <div class="logo"><svg width="20" height="20" viewBox="0 0 64 64"><path d="M10 54h26M22 54V34l14-16 14 8" stroke="#fff" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-    <div><h1>ArmCtl</h1><span>4-axis arm · 4× MG90S · Raspberry Pi Pico W</span></div>
+    <div><h1>ArmCtl</h1><span>4-axis arm · 4× MG90S · Arduino Uno</span></div>
   </div>
   <div class="seg" id="modeSeg" title="Simulator mode never sends anything to the arm">
     <button data-mode="sim">Simulator</button>
@@ -395,7 +395,7 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
     <div class="panel" id="tab-sim">
       <div class="card">
         <div class="head"><h3>Simulator mode</h3><span class="tag" id="simTag"></span></div>
-        <p class="muted">In simulator mode nothing is sent to the Pico — the 3D arm moves with realistic MG90S speeds so you can practise and test animations safely. Every control (joints, IK, poses, animations, keyboard) works the same as in live mode.</p>
+        <p class="muted">In simulator mode nothing is sent to the Arduino — the 3D arm moves with realistic MG90S speeds so you can practise and test animations safely. Every control (joints, IK, poses, animations, keyboard) works the same as in live mode.</p>
         <div class="row" style="margin-top:8px">
           <button class="btn blue" id="simEnter">Switch to simulator</button>
           <label class="chk"><input type="checkbox" data-bind="sim.realistic"> Realistic servo speed</label>
@@ -455,10 +455,10 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
         </div>
       </div>
       <div class="card">
-        <div class="head"><h3>On the Pico</h3><span class="tag" id="fwSafeTag"></span></div>
-        <p class="small muted">These run inside <code>main.py</code>, so they protect the arm even if the page, the browser or the USB cable misbehaves. They're sent to the Pico when you connect. After updating this page, download <code>main.py</code> again (Settings).</p>
+        <div class="head"><h3>On the Arduino</h3><span class="tag" id="fwSafeTag"></span></div>
+        <p class="small muted">These run inside <code>armctl.ino</code> on the Uno, so they protect the arm even if the page, the browser or the USB cable misbehaves. They're sent to the Uno when you connect. After updating this page, upload <code>armctl.ino</code> again (Settings).</p>
         <div class="grid3">
-          <label class="field"><span>Pico speed limit (°/s)</span><input type="number" min="30" max="1000" step="10" data-bind="safety.fwSlew"></label>
+          <label class="field"><span>Arduino speed limit (°/s)</span><input type="number" min="30" max="1000" step="10" data-bind="safety.fwSlew"></label>
           <label class="field"><span>Hold if no commands for (s)</span><input type="number" min="0.5" max="30" step="0.5" data-bind="safety.timeout"></label>
           <label class="field"><span>E-STOP</span><select data-bind="safety.estopMode"><option value="hold">Freeze in place (recommended)</option><option value="release">Release servos (arm goes limp)</option></select></label>
         </div>
@@ -515,25 +515,24 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
         <div class="tablewrap"><table id="pinTable"></table></div>
         <div id="pinMsgs" style="margin-top:10px;display:flex;flex-direction:column;gap:6px"></div>
         <div class="row" style="margin-top:12px">
-          <label class="chk small"><input type="checkbox" id="pinSave" checked> Save on the Pico (survives reboot)</label>
+          <label class="chk small"><input type="checkbox" id="pinSave" checked> Also save on the Arduino (EEPROM)</label>
           <span class="grow"></span>
           <button class="btn sm ghost" id="pinDefaults">Defaults</button>
-          <button class="btn sm primary" id="pinApply">Send to Pico</button>
+          <button class="btn sm primary" id="pinApply">Send to Arduino</button>
         </div>
       </div>
       <div class="card">
-        <div class="head"><h3>Pico W pinout</h3><span class="small muted">top view, USB at the top</span></div>
-        <svg class="pinout" id="pinout" viewBox="0 0 520 330"></svg>
+        <div class="head"><h3>Arduino Uno pinout</h3><span class="small muted">top view, USB on the left</span></div>
+        <svg class="pinout" id="pinout" viewBox="0 30 540 330"></svg>
       </div>
       <div class="card small">
         <div class="head"><h3>Wiring notes</h3></div>
         <ul style="margin:0;padding-left:18px">
-          <li>Power the four MG90S from a separate 5 V supply (≥ 3 A; each can draw ~0.7 A when stalled). Never from the Pico's 3V3 pin, and not from USB.</li>
-          <li>Connect the servo supply ground to a Pico <b>GND</b> pin — the signal needs a common ground.</li>
-          <li>GP23, GP24, GP25 and GP29 are used by the Pico W's wireless chip and can't be assigned.</li>
-          <li>GPn and GPn+16 share one PWM output (e.g. GP0 &amp; GP16), so two servos can't use both.</li>
-          <li>Servo wires: <b>orange/yellow</b> = signal (to the GPIO above), <b>red</b> = +5 V (servo supply), <b>brown/black</b> = ground.</li>
-          <li>NeoPixels (optional) run on PIO, so any free GPIO works. Put a 330 Ω resistor in series with the data line.</li>
+          <li>Power the four MG90S from a separate 5 V supply (≥ 3 A; each can draw ~0.7 A when stalled). <b>Not</b> from the Uno's 5V pin or USB — the Uno would brown out and restart.</li>
+          <li>Connect the servo supply's ground to an Uno <b>GND</b> pin — the signal needs a common ground.</li>
+          <li>Servo wires: <b>orange/yellow</b> = signal (to the pin above), <b>red</b> = +5 V (servo supply), <b>brown/black</b> = ground.</li>
+          <li>Any of D2–D13 and A0–A5 can drive a servo. D0 and D1 are the USB serial port and can't be used. D13 blinks while the Uno starts, which can make a servo twitch.</li>
+          <li>NeoPixels (optional) need the “Adafruit NeoPixel” library in the Arduino IDE. Put a 330 Ω resistor in series with the data line. The Uno has little memory, so use at most 60 LEDs.</li>
         </ul>
       </div>
     </div>
@@ -549,7 +548,7 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
         <div class="grid3">
           <label class="field"><span>LED type</span><select data-bind="led.type" id="ledType"></select></label>
           <label class="field"><span>Data pin</span><select data-bind="led.pin" data-num id="ledPin"></select></label>
-          <label class="field"><span>Number of LEDs</span><input type="number" min="1" max="300" data-bind="led.count"></label>
+          <label class="field"><span>Number of LEDs</span><input type="number" min="1" max="60" data-bind="led.count"></label>
           <label class="field"><span>Color order</span><select data-bind="led.order" id="ledOrder"></select></label>
           <label class="field"><span>Channels</span><select data-bind="led.bpp" data-num id="ledBpp"><option value="3">RGB (3)</option><option value="4">RGBW (4)</option></select></label>
           <label class="field"><span>Data rate</span><select data-bind="led.khz" data-num><option value="800">800 kHz</option><option value="400">400 kHz</option></select></label>
@@ -575,7 +574,7 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
         <h4>Quick colors</h4>
         <div class="swatches" id="swatches"></div>
         <p class="small muted" style="margin-top:10px">Status effect: amber pulse = waiting for a connection · primary color = connected · green = moving · red = E-stop.</p>
-        <div class="row end" style="margin-top:8px"><button class="btn sm primary" id="ledApply">Send to Pico</button></div>
+        <div class="row end" style="margin-top:8px"><button class="btn sm primary" id="ledApply">Send to Arduino</button></div>
       </div>
     </div>
 
@@ -598,7 +597,7 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
         <div class="head"><h3>USB connection</h3><span class="tag" id="serialSupport"></span></div>
         <div class="row">
           <label class="field" style="width:150px"><span>Update rate (Hz)</span><input type="number" min="5" max="60" data-bind="conn.rate"></label>
-          <label class="chk"><input type="checkbox" data-bind="conn.autoReconnect"> Reconnect when the Pico is plugged back in</label>
+          <label class="chk"><input type="checkbox" data-bind="conn.autoReconnect"> Reconnect when the Arduino is plugged back in</label>
         </div>
         <p class="small muted" id="connHint"></p>
         <h4>Ports</h4>
@@ -607,14 +606,15 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
           <span class="small muted grow">The browser's port picker shows the COM / tty name (e.g. COM3). Web pages can't read that name, so ports here are listed by their USB vendor:product ID.</span></div>
       </div>
       <div class="card">
-        <div class="head"><h3>Pico firmware (MicroPython)</h3></div>
-        <p class="small muted">Generates a <code>main.py</code> that talks to this page over USB, using your current pin and LED settings. Works on a Raspberry Pi Pico or Pico W.</p>
+        <div class="head"><h3>Arduino firmware (armctl.ino)</h3></div>
+        <p class="small muted">Generates an Arduino sketch that talks to this page over USB, using your current pin, LED and safety settings.</p>
         <ol class="small" style="margin:6px 0;padding-left:18px">
-          <li>Install MicroPython on the Pico (hold BOOTSEL while plugging it in, then copy the MicroPython .uf2 file onto it).</li>
-          <li>Save the downloaded file onto the Pico as <code>main.py</code>, e.g. with Thonny.</li>
-          <li>Close Thonny (only one program can use the USB port), then click <b>Connect USB</b> here and pick the Pico.</li>
+          <li>Install the <b>Arduino IDE</b> (arduino.cc). If you use NeoPixels, also install the <b>Adafruit NeoPixel</b> library (Sketch → Include Library → Manage Libraries).</li>
+          <li>Download <code>armctl.ino</code> and open it in the Arduino IDE (let it create the “armctl” folder).</li>
+          <li>Tools → Board → <b>Arduino Uno</b>, Tools → Port → your Uno, then click <b>Upload</b>.</li>
+          <li>Close the IDE's Serial Monitor (only one program can use the port), then click <b>Connect USB</b> here.</li>
         </ol>
-        <div class="row end"><button class="btn sm primary" id="fwDownload">Download main.py</button></div>
+        <div class="row end"><button class="btn sm primary" id="fwDownload">Download armctl.ino</button></div>
         <p class="small muted">The 3D view loads three.js from the internet; without internet the page falls back to a 2D schematic view.</p>
       </div>
       <div class="card">
@@ -634,9 +634,9 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
         </div>
         <div class="console" id="console"></div>
         <div class="row" style="margin-top:8px">
-          <input type="text" id="rawCmd" class="grow mono" placeholder='{"t":"ping"}'>
+          <input type="text" id="rawCmd" class="grow mono" placeholder="? (hello) · p 1 (ping) · P 1500 1500 1500 1500">
           <button class="btn sm" id="rawSend">Send</button>
-          <button class="btn sm ghost" id="picoReset" title="Ctrl-C + Ctrl-D: restarts main.py on the Pico">Restart Pico</button>
+          <button class="btn sm ghost" id="boardReset" title="Restarts the Uno, like its reset button">Restart Arduino</button>
         </div>
       </div>
     </div>
@@ -644,313 +644,327 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
 </main>
 <div class="toast" id="toast"></div>
 
-<!-- MicroPython firmware template (filled in by "Download main.py") -->
+<!-- Arduino Uno firmware template (filled in by "Download armctl.ino") -->
 <script type="text/plain" id="fwTemplate">
-# ArmCtl firmware for Raspberry Pi Pico / Pico W (MicroPython 1.20 or newer)
-# Generated by the ArmCtl page. Save this file on the Pico as main.py.
-# The page talks to it over USB (Web Serial): one JSON message per line.
-# To get back to the MicroPython prompt (e.g. in Thonny), press Ctrl-C.
-import time, json, sys, math, machine, neopixel, select
-try:
-    import asyncio
-except ImportError:
-    import uasyncio as asyncio
+// ArmCtl firmware for Arduino Uno — 4x MG90S robotic arm.
+// Generated by the ArmCtl web page with your pins and settings.
+//
+// How to install:
+//   1. Open this file in the Arduino IDE. It will offer to put it in a folder called "armctl": click OK.
+//   2. Tools > Board > "Arduino Uno", and Tools > Port > your Uno's port.
+//   3. Click Upload. Then close the Serial Monitor and click "Connect USB" in the ArmCtl page.
+//
+// The page sends one short text command per line at 115200 baud and the Uno answers with JSON lines.
+// Safety on the board itself: every pulse is clamped to the servo's calibrated range, each servo is
+// speed-limited, and the arm holds its position if the commands stop (cable pulled, page closed).
 
-FW = "armctl-usb-1.1"
-CFG_FILE = "arm_cfg.json"
+#include <Servo.h>
+#include <EEPROM.h>
 
-# Pins & LED setup from the web page. A config saved from the page (arm_cfg.json) overrides it.
-cfg = json.loads('''{{CFG}}''')
-try:
-    with open(CFG_FILE) as f:
-        cfg = json.load(f)
-except Exception:
-    pass
+#define USE_NEOPIXEL {{USE_NEOPIXEL}}   // 1 needs the "Adafruit NeoPixel" library (Sketch > Include Library > Manage Libraries)
+#if USE_NEOPIXEL
+#include <Adafruit_NeoPixel.h>
+#endif
 
-st = {"estop": False, "moved": 0, "seen": 0, "lost": False}
-led = {"mode": "status", "c1": [0, 120, 255, 0], "c2": [255, 0, 120, 0], "bri": 80, "speed": 50}
-led.update(cfg.get("fx", {}))
-pwms = []
-pins_used = []
-np = None
+#define FW "armctl-uno-1.0"
+#define NSERVO 4                 // base, shoulder, elbow, gripper
+#define MAX_LEDS 60              // the Uno has only 2 KB of RAM
 
+struct ServoCfg { uint8_t pin; uint16_t minUs, maxUs, slew; };   // slew = max pulse change in µs per second
+struct Config {
+  uint16_t magic;
+  uint16_t timeout;              // ms without commands before the arm holds still
+  ServoCfg s[NSERVO];
+  uint8_t ledPin, ledCount, ledBpp, ledKhz800;
+  char ledOrder[5];              // colour order, e.g. "GRB" or "GRBW"
+  uint8_t fx[11];                // effect, colour 1 (r g b w), colour 2 (r g b w), brightness, speed
+};
+const uint16_t MAGIC = {{MAGIC}};      // changes with every download, so a new upload ignores old EEPROM settings
+// Settings from the page. Settings saved from the page into EEPROM replace these.
+Config cfg = {{CFG}};
 
-def save_cfg():
-    try:
-        with open(CFG_FILE, "w") as f:
-            json.dump(cfg, f)
-        return True
-    except Exception as e:
-        print("save failed", e)
-        return False
+Servo servo[NSERVO];
+uint8_t attachedPin[NSERVO];     // 0 = no pulses (pins 0 and 1 are the USB serial port, never servos)
+float cur[NSERVO];               // pulse being output now (µs)
+uint16_t tgt[NSERVO];            // pulse we're moving towards (µs)
+bool estop = false, lost = false;
+unsigned long seen = 0, moved = 0, lastStep = 0, lastRx = 0;
+char line[100];
+uint8_t len = 0;
+bool overflow = false;
 
+// ---------------- servos ----------------
+uint16_t limitUs(uint8_t i, long v) {
+  if (v < cfg.s[i].minUs) return cfg.s[i].minUs;
+  if (v > cfg.s[i].maxUs) return cfg.s[i].maxUs;
+  return v;
+}
 
-# ---------------- servos (with safety limits) ----------------
-# Every pulse is clamped to the servo's min/max (from the page's calibration) and changes at most
-# "slew" microseconds per second, so no command can slam a joint past its range or jerk it.
-cur_us = []    # pulse being output now (None = no pulses yet / released)
-tgt_us = []    # pulse we're moving towards
+void detachServo(uint8_t i) {
+  if (attachedPin[i]) { servo[i].detach(); attachedPin[i] = 0; }
+}
 
+void applyServoConfig() {        // new limits apply right away; a servo moved to another pin waits for a new position
+  for (uint8_t i = 0; i < NSERVO; i++) {
+    if (attachedPin[i] && attachedPin[i] != cfg.s[i].pin) detachServo(i);
+    if (attachedPin[i]) {
+      tgt[i] = limitUs(i, tgt[i]);
+      cur[i] = limitUs(i, (long)(cur[i] + 0.5));
+      servo[i].writeMicroseconds((int)cur[i]);
+    }
+  }
+}
 
-def limit(i, v):
-    s = cfg["servos"][i]
-    return max(s.get("min", 500), min(s.get("max", 2500), v))
+void setTargets(const long *us) {
+  for (uint8_t i = 0; i < NSERVO; i++) {
+    if (us[i] <= 0) continue;
+    tgt[i] = limitUs(i, us[i]);
+    if (!attachedPin[i]) {       // first position after power-up or release: the servo's position is unknown
+      cur[i] = tgt[i];
+      servo[i].attach(cfg.s[i].pin, 400, 2600);
+      servo[i].writeMicroseconds(tgt[i]);
+      attachedPin[i] = cfg.s[i].pin;
+    }
+  }
+}
 
+void hold() {                    // stop where we are
+  for (uint8_t i = 0; i < NSERVO; i++) { tgt[i] = (uint16_t)(cur[i] + 0.5); cur[i] = tgt[i]; }
+}
 
-def out(i):
-    pwms[i].duty_ns(int(cur_us[i] * 1000))
+void release() {                 // no more pulses: the servos go limp
+  for (uint8_t i = 0; i < NSERVO; i++) detachServo(i);
+}
 
+void stepServos() {
+  unsigned long now = millis();
+  if (now - lastStep < 10) return;
+  float dt = (now - lastStep) / 1000.0;
+  if (dt > 0.1) dt = 0.1;
+  lastStep = now;
+  // watchdog: the page went quiet (USB unplugged, page closed, computer asleep) -> stop where we are
+  if (seen && !lost && now - seen > cfg.timeout) {
+    lost = true;
+    hold();
+    Serial.println(F("{\"t\":\"log\",\"msg\":\"no commands - holding position\"}"));
+  }
+  for (uint8_t i = 0; i < NSERVO; i++) {
+    if (!attachedPin[i]) continue;
+    float c = cur[i], t = tgt[i];
+    if (c == t) continue;
+    float step = cfg.s[i].slew * dt;
+    cur[i] = fabs(t - c) <= step ? t : c + (t > c ? step : -step);
+    servo[i].writeMicroseconds((int)(cur[i] + 0.5));
+  }
+}
 
-def setup_servos():
-    global pwms, pins_used, cur_us, tgt_us
-    pins = [s["pin"] for s in cfg["servos"]]
-    if pins != pins_used:
-        for p in pwms:
-            try:
-                p.deinit()
-            except Exception:
-                pass
-        for n in pins_used:
-            machine.Pin(n, machine.Pin.IN)
-        pwms = []
-        for n in pins:
-            p = machine.PWM(machine.Pin(n))
-            p.freq(50)
-            p.duty_u16(0)          # no pulses until the page sends a position
-            pwms.append(p)
-        pins_used = pins
-        cur_us = [None] * len(pins)
-        tgt_us = [None] * len(pins)
-    for i in range(len(pwms)):     # new limits apply right away
-        if cur_us[i] is not None:
-            cur_us[i] = limit(i, cur_us[i])
-            tgt_us[i] = limit(i, tgt_us[i])
-            out(i)
+// ---------------- NeoPixels (optional) ----------------
+#if USE_NEOPIXEL
+Adafruit_NeoPixel strip;
+bool ledsShown = true;
 
+uint16_t neoType() {             // Adafruit NEO_xxx value for a colour order like "GRB" or "GRBW"
+  const char *o = cfg.ledOrder;
+  const char *r = strchr(o, 'R'), *g = strchr(o, 'G'), *b = strchr(o, 'B'), *w = strchr(o, 'W');
+  if (!r || !g || !b) return NEO_GRB + NEO_KHZ800;
+  uint8_t ri = r - o, gi = g - o, bi = b - o, wi = (cfg.ledBpp == 4 && w) ? w - o : ri;
+  return ((wi << 6) | (ri << 4) | (gi << 2) | bi) + (cfg.ledKhz800 ? NEO_KHZ800 : NEO_KHZ400);
+}
 
-def set_targets(us):
-    for i in range(min(len(us), len(pwms))):
-        if not us[i]:
-            continue
-        tgt_us[i] = limit(i, us[i])
-        if cur_us[i] is None:      # first command after power-up or release: the servo's position is unknown
-            cur_us[i] = tgt_us[i]
-            out(i)
+void setupLeds() {
+  strip.clear(); strip.show();
+  if (cfg.ledCount > MAX_LEDS) cfg.ledCount = MAX_LEDS;
+  if (!cfg.ledCount || cfg.ledPin < 2) { strip.updateLength(0); return; }
+  strip.updateType(neoType());
+  strip.updateLength(cfg.ledCount);
+  strip.setPin(cfg.ledPin);
+  strip.begin();
+  strip.clear();
+  ledsShown = false;
+}
 
+void wheel(uint8_t p, float *c) {
+  if (p < 85) { c[0] = 255 - p * 3; c[1] = p * 3; c[2] = 0; }
+  else if (p < 170) { p -= 85; c[0] = 0; c[1] = 255 - p * 3; c[2] = p * 3; }
+  else { p -= 170; c[0] = p * 3; c[1] = 0; c[2] = 255 - p * 3; }
+  c[3] = 0;
+}
 
-def hold():
-    for i in range(len(pwms)):
-        tgt_us[i] = cur_us[i]
+void renderLeds() {
+  static unsigned long last = 0;
+  static uint32_t t = 0, lastSum = 0;
+  unsigned long now = millis();
+  if (!strip.numPixels() || now - last < 40) return;
+  last = now; t++;
+  const uint8_t *f = cfg.fx;
+  const uint8_t *c1 = f + 1, *c2 = f + 5;
+  float bri = f[9] / 255.0, sp = max(1, f[10]) / 50.0;
+  uint16_t n = strip.numPixels();
+  uint32_t sum = 0;
+  for (uint16_t i = 0; i < n; i++) {
+    float c[4] = {0, 0, 0, 0}, k = 1;
+    switch (f[0]) {
+      case 1: {                  // status: red = E-STOP, amber blink = no commands, green = moving, colour 1 = connected
+        uint8_t red[4] = {255, 0, 0, 0}, amber[4] = {255, 140, 0, 0}, green[4] = {0, 255, 60, 0};
+        const uint8_t *s;
+        if (estop) s = red;
+        else if (lost) { s = amber; k = 0.1 + 0.9 * (sin(t * 0.3) + 1) / 2; }
+        else if (now - moved < 600 && moved) s = green;
+        else if (seen && now - seen < 4000) { s = c1; k = 0.45 + 0.55 * (sin(t * 0.06) + 1) / 2; }
+        else { s = amber; k = 0.1 + 0.9 * (sin(t * 0.14) + 1) / 2; }
+        for (uint8_t j = 0; j < 4; j++) c[j] = s[j];
+        break;
+      }
+      case 2: for (uint8_t j = 0; j < 4; j++) c[j] = c1[j]; break;                                   // solid
+      case 3: for (uint8_t j = 0; j < 4; j++) c[j] = c1[j]; k = 0.05 + 0.95 * (sin(t * 0.07 * sp) + 1) / 2; break;   // breathe
+      case 4: wheel((uint8_t)(i * 256 / n + t * 2.4 * sp), c); break;                               // rainbow
+      case 5: {                  // chase
+        float tail = max(1, n / 3);
+        uint16_t head = (uint16_t)(t * 0.3 * sp) % n, d = (head + n - i) % n;
+        if (d < tail) { for (uint8_t j = 0; j < 4; j++) c[j] = c1[j]; k = 1 - d / tail; }
+        else { for (uint8_t j = 0; j < 4; j++) c[j] = c2[j]; k = 0.15; }
+        break;
+      }
+      case 6: {                  // gradient
+        float u = fmod((float)i / n + t * 0.005 * sp, 1.0);
+        u = 1 - fabs(2 * u - 1);
+        for (uint8_t j = 0; j < 4; j++) c[j] = c1[j] + (c2[j] - c1[j]) * u;
+        break;
+      }
+      default: k = 0;            // off
+    }
+    uint8_t v[4];
+    for (uint8_t j = 0; j < 4; j++) { float x = c[j] * bri * k; v[j] = x < 0 ? 0 : x > 255 ? 255 : (uint8_t)x; sum = sum * 31 + v[j]; }
+    strip.setPixelColor(i, v[0], v[1], v[2], v[3]);
+  }
+  if (sum != lastSum) { lastSum = sum; ledsShown = false; }
+}
 
+// Sending to the LEDs blocks interrupts for a moment, which could drop USB bytes:
+// only do it when no command is arriving.
+void showLeds(bool lineJustDone) {
+  if (!ledsShown && (lineJustDone || millis() - lastRx > 15) && !Serial.available()) { strip.show(); ledsShown = true; }
+}
+#endif
 
-def release():
-    for i in range(len(pwms)):
-        pwms[i].duty_u16(0)
-        cur_us[i] = None
-        tgt_us[i] = None
+// ---------------- settings in EEPROM ----------------
+void saveConfig() { EEPROM.put(0, cfg); }
 
+// ---------------- commands from the page ----------------
+long num(char *&p) { return strtol(p, &p, 10); }
+long numIn(char *&p, long lo, long hi) {   // next number, kept in range (constrain() is a macro: it would read it twice)
+  long v = num(p);
+  return v < lo ? lo : v > hi ? hi : v;
+}
+char *nextWord(char *&p) {
+  while (*p == ' ') p++;
+  char *w = p;
+  while (*p && *p != ' ') p++;
+  if (*p) *p++ = 0;
+  return w;
+}
 
-async def servo_task():
-    last = time.ticks_ms()
-    while True:
-        await asyncio.sleep_ms(10)
-        now = time.ticks_ms()
-        dt = time.ticks_diff(now, last) / 1000
-        last = now
-        # watchdog: the page went quiet (USB unplugged, page closed, computer asleep) -> stop where we are
-        if st["seen"] and not st["lost"] and time.ticks_diff(now, st["seen"]) > cfg.get("timeout", 2000):
-            st["lost"] = True
-            hold()
-            print(json.dumps({"t": "log", "msg": "no commands - holding position"}))
-        for i in range(len(pwms)):
-            c, t = cur_us[i], tgt_us[i]
-            if c is None or t is None or c == t:
-                continue
-            step = cfg["servos"][i].get("slew", 2000) * dt
-            cur_us[i] = t if abs(t - c) <= step else c + (step if t > c else -step)
-            out(i)
+void hello() {
+  Serial.print(F("{\"t\":\"hello\",\"fw\":\"" FW "\",\"servos\":"));
+  Serial.print(NSERVO);
+  Serial.print(F(",\"neopixel\":"));
+  Serial.print(USE_NEOPIXEL);
+  Serial.println('}');
+}
 
+void handle(char *p) {
+  seen = millis();
+  char c = *p++;
+  switch (c) {
+    case 'P': {                  // P us0 us1 us2 us3 : servo positions (pulse widths)
+      long us[NSERVO];
+      for (uint8_t i = 0; i < NSERVO; i++) us[i] = num(p);
+      lost = false;
+      if (!estop) { setTargets(us); moved = seen; }   // ignored during E-STOP
+      break;
+    }
+    case 'p':                    // p id : ping
+      Serial.print(F("{\"t\":\"pong\",\"id\":"));
+      Serial.print(strtoul(p, &p, 10));
+      Serial.println('}');
+      break;
+    case '?': hello(); break;
+    case 'S':                    // S 0|1 : E-STOP, 0 = freeze in place, 1 = release the servos
+      estop = true;
+      if (num(p) == 1) release(); else hold();
+      break;
+    case 'R': estop = false; break;        // reset the E-STOP
+    case 'H': hold(); break;               // hold still (page switched to the simulator)
+    case 'O': release(); estop = num(p) == 1; break;
+    case 'C': {                  // C save timeout n [pin min max slew]*n ledPin ledCount bpp khz800 order
+      bool save = num(p) == 1;
+      cfg.timeout = numIn(p, 200, 30000);
+      uint8_t n = num(p);
+      for (uint8_t i = 0; i < n; i++) {
+        ServoCfg s;
+        s.pin = num(p); s.minUs = num(p); s.maxUs = num(p); s.slew = num(p);
+        if (i < NSERVO && s.pin >= 2 && s.pin <= 19 && s.minUs >= 400 && s.maxUs <= 2600 && s.minUs < s.maxUs && s.slew > 0) cfg.s[i] = s;
+      }
+      cfg.ledPin = num(p); cfg.ledCount = numIn(p, 0, MAX_LEDS); cfg.ledBpp = num(p) == 4 ? 4 : 3; cfg.ledKhz800 = num(p) != 0;
+      strncpy(cfg.ledOrder, nextWord(p), 4); cfg.ledOrder[4] = 0;
+      applyServoConfig();
+#if USE_NEOPIXEL
+      setupLeds();
+#endif
+      if (save) saveConfig();
+      Serial.print(F("{\"t\":\"ack\",\"what\":\"cfg\",\"saved\":"));
+      Serial.print(save ? F("true") : F("false"));
+      Serial.println('}');
+      break;
+    }
+    case 'L': {                  // L save effect r g b w r g b w brightness speed
+      bool save = num(p) == 1;
+      for (uint8_t k = 0; k < 11; k++) cfg.fx[k] = numIn(p, 0, 255);
+      if (save) saveConfig();
+      break;
+    }
+    default:
+      Serial.println(F("{\"t\":\"log\",\"msg\":\"unknown command\"}"));
+  }
+}
 
-# ---------------- NeoPixels ----------------
-def setup_led():
-    global np
-    if np:
-        try:
-            np.fill((0,) * np.bpp)
-            np.write()
-        except Exception:
-            pass
-    np = None
-    L = cfg.get("led")
-    if not L or L.get("count", 0) <= 0:
-        return
-    bpp = L.get("bpp", 3)
-    np = neopixel.NeoPixel(machine.Pin(L["pin"]), L["count"], bpp=bpp, timing=L.get("timing", 1))
-    order = L.get("order", "GRBW"[:bpp])
-    np.ORDER = tuple(order.index(c) for c in "RGBW"[:bpp])
+void setup() {
+  Serial.begin(115200);
+  Config saved;
+  EEPROM.get(0, saved);
+  if (saved.magic == MAGIC) cfg = saved;
+#if USE_NEOPIXEL
+  setupLeds();
+#endif
+  Serial.println(F("{\"t\":\"ready\",\"fw\":\"" FW "\"}"));
+}
 
-
-def wheel(p):
-    p = int(p) % 256
-    if p < 85:
-        return [255 - p * 3, p * 3, 0, 0]
-    if p < 170:
-        p -= 85
-        return [0, 255 - p * 3, p * 3, 0]
-    p -= 170
-    return [p * 3, 0, 255 - p * 3, 0]
-
-
-def render_led(t):
-    n = np.n
-    bpp = np.bpp
-    b = led["bri"] / 255
-    sp = max(1, led["speed"]) / 50
-    m = led["mode"]
-    c1 = (list(led["c1"]) + [0, 0, 0, 0])[:4]
-    c2 = (list(led["c2"]) + [0, 0, 0, 0])[:4]
-
-    def put(i, c, k=1.0):
-        np[i] = tuple(max(0, min(255, int(c[j] * b * k))) for j in range(bpp))
-
-    if m == "status":
-        now = time.ticks_ms()
-        if st["estop"]:
-            c, k = [255, 0, 0, 0], 1.0
-        elif st["lost"]:
-            c, k = [255, 140, 0, 0], 0.1 + 0.9 * (math.sin(t * 0.25) + 1) / 2
-        elif time.ticks_diff(now, st["moved"]) < 600:
-            c, k = [0, 255, 60, 0], 1.0
-        elif st["seen"] and time.ticks_diff(now, st["seen"]) < 4000:
-            c, k = c1, 0.45 + 0.55 * (math.sin(t * 0.05) + 1) / 2
-        else:
-            c, k = [255, 140, 0, 0], 0.1 + 0.9 * (math.sin(t * 0.12) + 1) / 2
-        for i in range(n):
-            put(i, c, k)
-    elif m == "solid":
-        for i in range(n):
-            put(i, c1)
-    elif m == "breathe":
-        k = 0.05 + 0.95 * (math.sin(t * 0.06 * sp) + 1) / 2
-        for i in range(n):
-            put(i, c1, k)
-    elif m == "rainbow":
-        for i in range(n):
-            put(i, wheel(i * 256 / n + t * 2 * sp))
-    elif m == "chase":
-        tail = max(1, n / 3)
-        head = int(t * 0.25 * sp) % n
-        for i in range(n):
-            d = (head - i) % n
-            if d < tail:
-                put(i, c1, 1 - d / tail)
-            else:
-                put(i, c2, 0.15)
-    elif m == "gradient":
-        for i in range(n):
-            k = (i / n + t * 0.004 * sp) % 1
-            k = 1 - abs(2 * k - 1)
-            put(i, [c1[j] + (c2[j] - c1[j]) * k for j in range(4)])
-    else:
-        np.fill((0,) * bpp)
-    np.write()
-
-
-async def led_task():
-    t = 0
-    while True:
-        if np:
-            try:
-                render_led(t)
-            except Exception as e:
-                print("led error", e)
-        t += 1
-        await asyncio.sleep_ms(33)
-
-
-# ---------------- protocol ----------------
-def handle(line):
-    try:
-        m = json.loads(line)
-    except Exception:
-        return None
-    st["seen"] = time.ticks_ms()
-    t = m.get("t")
-    if t == "pos":
-        st["lost"] = False
-        if not st["estop"]:        # ignored until the page resets the E-STOP
-            set_targets(m.get("us", []))
-            st["moved"] = st["seen"]
-    elif t == "stop":              # E-STOP: freeze in place, or go limp
-        st["estop"] = True
-        if m.get("mode") == "release":
-            release()
-        else:
-            hold()
-    elif t == "resume":
-        st["estop"] = False
-    elif t == "hold":
-        hold()
-    elif t == "off":
-        release()
-        st["estop"] = bool(m.get("estop", False))
-    elif t == "cfg":
-        if "servos" in m:
-            cfg["servos"] = m["servos"]
-        if "led" in m:
-            cfg["led"] = m["led"]
-        if "timeout" in m:
-            cfg["timeout"] = m["timeout"]
-        setup_servos()
-        setup_led()
-        saved = save_cfg() if m.get("save") else False
-        return {"t": "ack", "what": "cfg", "saved": saved}
-    elif t == "led":
-        led.update(m.get("fx", {}))
-        if m.get("save"):
-            cfg["fx"] = dict(led)
-            save_cfg()
-    elif t == "ping":
-        return {"t": "pong", "id": m.get("id")}
-    elif t == "hello":
-        return {"t": "hello", "fw": FW, "servos": len(pwms), "led": cfg.get("led")}
-    return None
-
-
-async def serial_task():
-    p = select.poll()
-    p.register(sys.stdin, select.POLLIN)
-    buf = []
-    while True:
-        while p.poll(0):
-            c = sys.stdin.read(1)
-            if c == "\n":
-                r = handle("".join(buf))
-                buf = []
-                if r:
-                    print(json.dumps(r))
-            elif c != "\r":
-                buf.append(c)
-                if len(buf) > 4096:
-                    buf = []
-        await asyncio.sleep_ms(4)
-
-
-async def main():
-    setup_servos()
-    setup_led()
-    asyncio.create_task(led_task())
-    asyncio.create_task(servo_task())
-    print(json.dumps({"t": "log", "msg": "ArmCtl ready on USB"}))
-    await serial_task()
-
-
-asyncio.run(main())
+void loop() {
+  bool lineDone = false;
+  while (Serial.available()) {
+    char ch = Serial.read();
+    lastRx = millis();
+    if (ch == '\n') {
+      line[len] = 0;
+      if (len && !overflow) { handle(line); lineDone = true; }
+      len = 0; overflow = false;
+    } else if (ch != '\r') {
+      if (len < sizeof(line) - 1) line[len++] = ch; else overflow = true;
+    }
+  }
+  stepServos();
+#if USE_NEOPIXEL
+  renderLeds();
+  showLeds(lineDone);
+#else
+  (void)lineDone;
+#endif
+}
 </script>
 
 <script type="module">
 /* =====================================================================
-   ArmCtl — control page for a 4-axis robotic arm (4× MG90S) on a Raspberry Pi Pico W
+   ArmCtl — control page for a 4-axis robotic arm (4× MG90S) driven by an Arduino Uno over USB
    ===================================================================== */
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -966,14 +980,15 @@ const JOINTS = [
   { id: 'elbow',    name: 'Elbow',    keys: ['e', 'd'], unit: '°', servo: 'MG90S' },
   { id: 'gripper',  name: 'Gripper',  keys: ['r', 'f'], unit: '%', servo: 'MG90S' },
 ];
-// Order here = order of pulse widths in the "pos" packet sent to the Pico
+// Order here = order of pulse widths in the "P" command sent to the Arduino
 const SERVOS = [
   { id: 'base',     name: 'Base',     joint: 'base',     type: 'MG90S' },
   { id: 'shoulder', name: 'Shoulder', joint: 'shoulder', type: 'MG90S' },
   { id: 'elbow',    name: 'Elbow',    joint: 'elbow',    type: 'MG90S' },
   { id: 'gripper',  name: 'Gripper',  joint: 'gripper',  type: 'MG90S' },
 ];
-const PICO_PINS = [...Array(23).keys(), 26, 27, 28];
+const BOARD_PINS = [...Array(18).keys()].map(i => i + 2);    // Uno D2–D13 and A0–A5 (14–19); D0/D1 are the USB serial port
+const pinName = p => p >= 14 ? 'A' + (p - 14) : 'D' + p;
 const LED_TYPES = {
   'WS2812B':     { order: 'GRB',  bpp: 3, khz: 800, info: '5 V, the most common NeoPixel.' },
   'WS2812':      { order: 'GRB',  bpp: 3, khz: 800, info: '5 V, older 6-pin version of the WS2812B.' },
@@ -1002,7 +1017,7 @@ const DEMO_ANIMS = (() => {
 })();
 const servoDefaults = (pin, type, extra = {}) => ({ pin, type, center: 90, invert: false, minAngle: 0, maxAngle: 180, minUs: 500, maxUs: 2500, range: 180, ...extra });
 const DEFAULT_CFG = {
-  version: 4,
+  version: 5,
   theme: 'auto',
   mode: 'sim',
   speed: 50,
@@ -1013,13 +1028,13 @@ const DEFAULT_CFG = {
     gripper:  { min: 0,   max: 100, home: 50 },
   },
   servos: {
-    base:     servoDefaults(0, 'MG90S'),
-    shoulder: servoDefaults(2, 'MG90S'),
-    elbow:    servoDefaults(4, 'MG90S'),
-    gripper:  servoDefaults(6, 'MG90S', { closedAngle: 40, openAngle: 130 }),
+    base:     servoDefaults(3, 'MG90S'),     // Arduino Uno D3
+    shoulder: servoDefaults(5, 'MG90S'),     // D5
+    elbow:    servoDefaults(6, 'MG90S'),     // D6
+    gripper:  servoDefaults(9, 'MG90S', { closedAngle: 40, openAngle: 130 }),   // D9
   },
   typeSpeed: { MG90S: 400 },
-  led: { enabled: true, type: 'WS2812B', pin: 15, count: 8, order: 'GRB', bpp: 3, khz: 800,
+  led: { enabled: false, type: 'WS2812B', pin: 7, count: 8, order: 'GRB', bpp: 3, khz: 800,
          mode: 'status', color1: '#0078ff', color2: '#ff0078', white: 0, brightness: 80, speed: 50 },
   conn: { rate: 30, autoReconnect: true, port: '' },   // port: 'VID:PID#n' of the chosen USB port
   view: { grid: true, envelope: true, axes: false, shadows: true, ikMarker: true, trail: false, animPath: true },
@@ -1052,6 +1067,11 @@ function loadCfg(saved) {
     if (Object.entries(old).every(([k, pin]) => sv[k]?.pin === undefined || +sv[k].pin === pin))
       for (const k of Object.keys(old)) if (sv[k]) sv[k].pin = DEFAULT_CFG.servos[k].pin;
     if (saved.led && +saved.led.pin === 16) saved.led.pin = DEFAULT_CFG.led.pin;
+  }
+  if (v < 5) {                                   // v5: Arduino Uno instead of the Pico: Pico pin numbers don't apply
+    for (const k of Object.keys(DEFAULT_CFG.servos)) if (saved.servos?.[k]) saved.servos[k].pin = DEFAULT_CFG.servos[k].pin;
+    if (saved.led) { saved.led.pin = DEFAULT_CFG.led.pin; saved.led.count = Math.min(+saved.led.count || 8, 60); }
+    if (saved.conn) saved.conn.port = '';
   }
   delete saved.version;
   return merge(DEFAULT_CFG, saved);
@@ -1262,11 +1282,32 @@ function pulses() {
 }
 
 /* =====================================================================
-   Connection: USB (Web Serial) to MicroPython main.py, one JSON message per line
+   Connection: USB (Web Serial) to the Arduino Uno sketch armctl.ino.
+   The page sends one short text command per line (the Uno has no room for a JSON parser);
+   the Uno answers with JSON lines. Opening the port restarts the Uno, so wait for its "ready".
    ===================================================================== */
-const PICO_VID = 0x2e8a;                       // Raspberry Pi (RP2040) USB vendor id
+const BAUD = 115200;
+const UNO_VIDS = { 0x2341: 'Arduino Uno', 0x2a03: 'Arduino Uno', 0x1a86: 'Arduino Uno clone (CH340)', 0x0403: 'FTDI USB serial', 0x10c4: 'CP210x USB serial' };
+const LED_MODES = ['off', 'status', 'solid', 'breathe', 'rainbow', 'chase', 'gradient'];
+const isUnoFw = fw => /^armctl-uno-/.test(fw || '');
+// Message -> text command for the Uno (see handle() in armctl.ino)
+function encode(m) {
+  switch (m.t) {
+    case 'pos': return 'P ' + m.us.join(' ');
+    case 'ping': return 'p ' + m.id;
+    case 'hello': return '?';
+    case 'stop': return 'S ' + (m.mode === 'release' ? 1 : 0);
+    case 'resume': return 'R';
+    case 'hold': return 'H';
+    case 'off': return 'O ' + (m.estop ? 1 : 0);
+    case 'cfg': return ['C', m.save ? 1 : 0, m.timeout, m.servos.length, ...m.servos.flatMap(s => [s.pin, s.min, s.max, s.slew]),
+      m.led.pin, m.led.count, m.led.bpp, m.led.timing, m.led.order].join(' ');
+    case 'led': { const f = m.fx; return ['L', m.save ? 1 : 0, Math.max(0, LED_MODES.indexOf(f.mode)), ...f.c1, ...f.c2, f.bri, f.speed].join(' '); }
+  }
+  return null;
+}
 const link = {
-  port: null, reader: null, writer: null, connected: false, connecting: false,
+  port: null, reader: null, writer: null, connected: false, connecting: false, booting: false, bootTimer: 0,
   wantOpen: false, lastPong: 0, rtt: null, lastSent: '', lastSendT: 0, fw: '', silentWarned: false,
 
   async open(port) {
@@ -1275,7 +1316,7 @@ const link = {
     this.connecting = true; updateConn();
     try {
       port ||= selectedPort() || await navigator.serial.requestPort();
-      await port.open({ baudRate: 115200 });
+      await port.open({ baudRate: BAUD });
       this.port = port; this.wantOpen = true;
       await refreshPorts(); choosePort(port);
       this.writer = port.writable.getWriter();
@@ -1283,7 +1324,7 @@ const link = {
       this.readSerial();
     } catch (e) {
       this.connecting = false; updateConn();
-      if (e.name !== 'NotFoundError') log('Connect failed: ' + e.message + (e.name === 'NetworkError' ? ' (is Thonny or another program using the port?)' : ''), 'er');
+      if (e.name !== 'NotFoundError') log('Connect failed: ' + e.message + (e.name === 'NetworkError' ? ' (is the Arduino IDE’s Serial Monitor or another program using the port?)' : ''), 'er');
     }
   },
   async readSerial() {
@@ -1302,16 +1343,40 @@ const link = {
     if (this.connected) this.close(false);     // unplugged: keep wantOpen so it reconnects when plugged back in
   },
   onOpen() {
-    this.connected = true; this.connecting = false; this.lastPong = performance.now(); this.lastSent = ''; this.silentWarned = false;
-    log('Connected over USB', 'rx'); toast('Connected to the Pico');
-    this.raw('\r\n');
+    this.connected = true; this.connecting = false; this.lastSent = ''; this.silentWarned = false; this.fw = '';
+    log('USB port open — waiting for the Arduino to start (it restarts when the port opens)…', 'rx');
+    this.waitBoot();
+    updateConn(); renderPorts();
+  },
+  waitBoot() {               // the Uno prints {"t":"ready"} after its bootloader; don't send before that
+    this.booting = true; clearTimeout(this.bootTimer);
+    this.bootTimer = setTimeout(() => this.handshake(), 3000);     // boards that don't auto-reset never say ready
+    updateConn();
+  },
+  handshake() {
+    if (!this.connected) return;
+    clearTimeout(this.bootTimer);
+    const first = this.booting;
+    this.booting = false; this.lastPong = performance.now(); this.lastSent = '';
+    this.raw('\n');
     this.send({ t: 'hello' });
     this.send(cfgPacket(false));
     this.send(ledPacket(false));
-    updateConn(); renderPorts();
+    if (first) toast('Connected to the Arduino');
+    updateConn();
+  },
+  async restart() {          // like pressing the Uno's reset button: pulse DTR
+    if (!this.port) { toast('Not connected'); return; }
+    this.waitBoot(); log('Restarting the Arduino…');
+    try {
+      await this.port.setSignals({ dataTerminalReady: false, requestToSend: false });
+      await new Promise(r => setTimeout(r, 120));
+      await this.port.setSignals({ dataTerminalReady: true, requestToSend: true });
+    } catch (e) { log('Could not restart the board from here: ' + e.message, 'er'); }
   },
   async close(byUser = true) {
     if (byUser) this.wantOpen = false;
+    clearTimeout(this.bootTimer); this.booting = false;
     const was = this.connected, p = this.port;
     this.connected = false; this.connecting = false; this.port = null; this.rtt = null;
     if (p) {
@@ -1321,13 +1386,14 @@ const link = {
     }
     this.writer = null; updateConn(); updateWarnings(); renderPorts();
     if (was) log(byUser ? 'Disconnected' : 'USB connection lost', byUser ? '' : 'er');
-    if (was && !byUser && live()) { stopAnim(); safetyEvent('USB connection lost — the Pico holds the arm still', true); }
+    if (was && !byUser && live()) { stopAnim(); safetyEvent('USB connection lost — the Arduino holds the arm still', true); }
     renderSafety();
   },
   raw(text) { if (this.writer) this.writer.write(new TextEncoder().encode(text)).catch(() => {}); },
   send(obj) {
-    if (!this.connected) return false;
-    const text = JSON.stringify(obj);
+    if (!this.connected || this.booting) return false;
+    const text = encode(obj);
+    if (!text) return false;
     this.raw(text + '\n');
     if (obj.t !== 'pos' && obj.t !== 'ping' || $('#logVerbose').checked) log('→ ' + text, 'tx');
     return true;
@@ -1335,13 +1401,22 @@ const link = {
   onLine(line) {
     let m; try { m = JSON.parse(line); } catch (e) {
       log('« ' + line);
-      if (/^(>>>|MicroPython|Type "help)/.test(line)) log('The Pico is at the MicroPython prompt, so main.py is not running. Save main.py on the Pico, then press "Restart Pico".', 'er');
+      if (/[\x00-\x08\ufffd]/.test(line)) log('Garbled data from the board: upload armctl.ino from Settings (it uses 115200 baud).', 'er');
       return;
+    }
+    if (m.t === 'ready') {
+      if (this.booting) log('Arduino started (' + (m.fw || '?') + ')', 'rx');
+      else {                 // it restarted on its own: almost always a power problem
+        stopAnim(); state.target = { ...state.current };
+        safetyEvent('The Arduino restarted unexpectedly — usually the servos are drawing power from the Uno. Power them from a separate 5 V supply.', true);
+      }
+      this.handshake(); return;
     }
     if (m.t === 'pong') { this.lastPong = performance.now(); this.rtt = Math.round(performance.now() - (m.id || 0)); this.silentWarned = false; updateConn(); return; }
     if (m.t === 'hello') {
       this.fw = m.fw || ''; renderSafety();
-      if (this.fw < FW_SAFE) safetyEvent('The Pico runs an old main.py without the Pico-side limits — download main.py again (Settings) and copy it to the Pico.', true);
+      if (!isUnoFw(this.fw)) safetyEvent('This board isn’t running armctl.ino — upload it from Settings with the Arduino IDE.', true);
+      if (!m.neopixel && cfg.led.enabled) log('The sketch on the Uno was made with NeoPixels off — download armctl.ino again to use the LEDs.', 'er');
     }
     log('← ' + line, 'rx');
   },
@@ -1350,7 +1425,7 @@ if ('serial' in navigator) {
   navigator.serial.addEventListener('connect', async e => {
     await refreshPorts();
     if (link.wantOpen && cfg.conn.autoReconnect && !link.connected && portKey(e.target) === cfg.conn.port) {
-      log('Pico plugged back in — reconnecting'); setTimeout(() => link.open(e.target), 800);
+      log('Arduino plugged back in — reconnecting'); setTimeout(() => link.open(e.target), 800);
     }
   });
   navigator.serial.addEventListener('disconnect', e => { if (e.target === link.port && link.connected) link.close(false); refreshPorts(); });
@@ -1363,11 +1438,14 @@ const hex4 = v => v == null ? '----' : v.toString(16).toUpperCase().padStart(4, 
 const portKey = p => ports.keys[ports.list.indexOf(p)] || '';
 function portName(p) {
   const v = p.getInfo().usbVendorId, [id, n] = portKey(p).split('#');
-  const name = v === PICO_VID ? 'Raspberry Pi Pico' : v != null ? 'USB serial device' : 'Serial port';
+  const name = UNO_VIDS[v] || (v != null ? 'USB serial device' : 'Serial port');
   return `${name}${v != null ? ` (${id})` : ''}${+n > 1 ? ` #${n}` : ''}`;
 }
 // The saved port if it is plugged in, otherwise the only available port
-const selectedPort = () => ports.list[ports.keys.indexOf(cfg.conn.port)] || (ports.list.length === 1 ? ports.list[0] : null);
+const selectedPort = () => {
+  const unos = ports.list.filter(p => p.getInfo().usbVendorId in UNO_VIDS);
+  return ports.list[ports.keys.indexOf(cfg.conn.port)] || (ports.list.length === 1 ? ports.list[0] : unos.length === 1 ? unos[0] : null);
+};
 function choosePort(p) { const k = portKey(p); if (k && k !== cfg.conn.port) { cfg.conn.port = k; saveCfg(); } renderPorts(); }
 async function refreshPorts() {
   if (!('serial' in navigator)) { renderPorts(); return; }
@@ -1414,13 +1492,13 @@ function cfgPacket(save) {
   const L = cfg.led;
   return {
     t: 'cfg', save: !!save,
-    // Pico-side safety: pulse range from the calibrated min/max angle, speed limit in µs per second
+    // Board-side safety: pulse range from the calibrated min/max angle, speed limit in µs per second
     servos: SERVOS.map(s => {
       const c = cfg.servos[s.id], a = [angleToUs(s.id, +c.minAngle), angleToUs(s.id, +c.maxAngle)];
       return { id: s.id, pin: +c.pin, freq: 50, min: Math.min(...a), max: Math.max(...a), slew: Math.round(+cfg.safety.fwSlew * Math.abs(c.maxUs - c.minUs) / c.range) };
     }),
     timeout: Math.round(+cfg.safety.timeout * 1000),
-    led: { pin: +L.pin, count: L.enabled ? +L.count : 0, bpp: +L.bpp, timing: +L.khz === 800 ? 1 : 0, order: L.order, type: L.type },
+    led: { pin: +L.pin, count: L.enabled ? clamp(+L.count, 0, 60) : 0, bpp: +L.bpp, timing: +L.khz === 800 ? 1 : 0, order: L.order, type: L.type },
   };
 }
 const hexRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) || 0);
@@ -1430,17 +1508,17 @@ function ledPacket(save) {
 }
 function updateConn() {
   const dot = $('#connDot'), txt = $('#connText'), btn = $('#connBtn');
-  dot.className = 'dot' + (link.connected ? ' ok' : link.connecting ? ' warn' : '');
-  txt.textContent = link.connected ? `USB connected${link.rtt != null ? ' · ' + link.rtt + ' ms' : ''}` : link.connecting ? 'Connecting…' : 'Disconnected';
+  dot.className = 'dot' + (link.connected && !link.booting ? ' ok' : link.connecting || link.booting ? ' warn' : '');
+  txt.textContent = link.booting ? 'Arduino starting…' : link.connected ? `USB connected${link.rtt != null ? ' · ' + link.rtt + ' ms' : ''}` : link.connecting ? 'Connecting…' : 'Disconnected';
   btn.textContent = link.connected || link.connecting ? 'Disconnect' : 'Connect USB';
 }
 // keep-alive + latency
 setInterval(() => {
-  if (!link.connected) return;
+  if (!link.connected || link.booting) return;
   link.send({ t: 'ping', id: Math.round(performance.now()) });
   if (performance.now() - link.lastPong > 6000 && !link.silentWarned) {
     link.silentWarned = true;
-    log('No reply from the Pico — is main.py running on it? Try "Restart Pico" in Settings.', 'er');
+    log('No reply from the Arduino — is armctl.ino uploaded to it? Try "Restart Arduino" in Settings.', 'er');
   }
 }, 2000);
 
@@ -1690,6 +1768,7 @@ function stopAnim(rewind = false) {
 function stepAnim(dt) {
   if (!anim.playing) return;
   const a = curAnim(), dur = animDur(a);
+  if (a.keys.length < 2) { stopAnim(true); return; }      // keyframes were deleted while playing
   if (anim.phase === 'approach') {           // let the servos reach the pose before the clock runs
     if (JOINTS.some(j => Math.abs(state.current[j.id] - state.target[j.id]) > 1)) return;
     anim.phase = 'run'; animStatus(live() ? 'Playing on the arm (USB)' : 'Playing in the simulator', 'ok');
@@ -1844,7 +1923,7 @@ function updateAnimPath() {
 function setupAnimEvents() {
   setupTimeline();
   $('#animSel').addEventListener('change', e => { stopAnim(true); stopRec(); cfg.animSel = +e.target.value; anim.sel = -1; saveCfg(); renderAnimUI(); updateAnimPath(); });
-  const named = (name, keys = []) => { cfg.anims.push({ name, loop: false, keys }); cfg.animSel = cfg.anims.length - 1; anim.sel = -1; anim.t = 0; animChanged(); };
+  const named = (name, keys = []) => { stopAnim(true); stopRec(); cfg.anims.push({ name, loop: false, keys }); cfg.animSel = cfg.anims.length - 1; anim.sel = -1; anim.t = 0; animChanged(); };
   $('#animNew').addEventListener('click', () => { const n = prompt('Name of the new animation', `Animation ${cfg.anims.length + 1}`); if (n) named(n.trim() || 'Animation'); });
   $('#animDup').addEventListener('click', () => { const a = curAnim(); named(a.name + ' copy', structuredClone(a.keys)); });
   $('#animRename').addEventListener('click', () => { const a = curAnim(), n = prompt('Rename animation', a.name); if (n && n.trim()) { a.name = n.trim(); saveCfg(); renderAnimUI(); } });
@@ -1912,7 +1991,6 @@ function renderMode() {
 /* =====================================================================
    Safety system
    ===================================================================== */
-const FW_SAFE = 'armctl-usb-1.1';            // first main.py with the Pico-side limits
 // Stops a move that would hit something. Moving out of (or not deeper into) a collision is allowed.
 function guardMotion(prev) {
   if (!cfg.safety.collide) return;
@@ -1937,25 +2015,26 @@ function safetyEvent(msg, warn = false) {
 }
 let cfgSendT = 0;
 function sendCfgSoon() { clearTimeout(cfgSendT); cfgSendT = setTimeout(() => { if (link.connected) link.send(cfgPacket(false)); }, 600); }
-const fwHasSafety = () => link.connected && link.fw >= FW_SAFE;
+const fwHasSafety = () => link.connected && isUnoFw(link.fw);
 function renderSafety() {
   const S = cfg.safety, J = cfg.joints, on = (b, a = 'On', o = 'Off') => `<span class="tag ${b ? 'ok' : 'err'}">${b ? a : o}</span>`;
-  const fw = !link.connected ? '<span class="tag">Not connected</span>' : fwHasSafety() ? on(true, 'Active on Pico') : '<span class="tag err">Old main.py</span>';
+  const fw = !link.connected ? '<span class="tag">Not connected</span>' : fwHasSafety() ? on(true, 'Active on Arduino') : '<span class="tag err">Upload armctl.ino</span>';
   const rows = [
     ['Joint limits', JOINTS.map(j => `${j.name} ${J[j.id].min}…${J[j.id].max}${j.unit}`).join(' · '), on(true)],
     ['Collision guard', `Table (${S.floorMargin} mm clearance), base, shoulder and upper arm`, on(S.collide)],
     ['Speed & acceleration', `≤ ${cfg.typeSpeed.MG90S} °/s, ${S.accel} °/s² ramps`, on(true)],
     ['Animation check', 'Red segments (too fast, unreachable, collision) can\'t play on the real arm', on(true)],
     ['E-STOP (Esc)', S.estopMode === 'release' ? 'Releases the servos' : 'Freezes the arm in place', on(true)],
-    ['Pico pulse limits', 'Each servo clamped to its calibrated Min/Max angle', fw],
-    ['Pico speed limit', `≤ ${S.fwSlew} °/s even if the page sends a jump`, fw],
-    ['Lost connection', `Pico holds position after ${S.timeout} s without commands`, fw],
+    ['Arduino pulse limits', 'Each servo clamped to its calibrated Min/Max angle', fw],
+    ['Arduino speed limit', `≤ ${S.fwSlew} °/s even if the page sends a jump`, fw],
+    ['Lost connection', `Arduino holds position after ${S.timeout} s without commands`, fw],
+    ['Power check', 'Warns if the Arduino restarts by itself (servos powered from the Uno)', fw],
   ];
   $('#safeTable').innerHTML = '<tr><th>Protection</th><th>What it does</th><th>Status</th></tr>' + rows.map(r => `<tr><td><b>${r[0]}</b></td><td class="small">${r[1]}</td><td>${r[2]}</td></tr>`).join('');
   const st = $('#safeState'), off = !S.collide;
   st.textContent = off ? 'collision guard off' : 'protected'; st.className = 'tag ' + (off ? 'err' : 'ok');
   const ft = $('#fwSafeTag');
-  ft.textContent = !link.connected ? 'Not connected' : fwHasSafety() ? 'Active on Pico' : 'Old main.py — update it';
+  ft.textContent = !link.connected ? 'Not connected' : fwHasSafety() ? 'Active on Arduino' : 'Upload armctl.ino';
   ft.className = 'tag' + (fwHasSafety() ? ' ok' : link.connected ? ' err' : '');
 }
 
@@ -2086,7 +2165,7 @@ function refreshCalInfo() {
   for (const d of $$('#calServos details')) {
     const id = d.dataset.servo, sv = SERVOS.find(s => s.id === id), s = cfg.servos[id];
     const a = id in state.overrides ? state.overrides[id] : servoAngle(id, state.current[sv.joint]);
-    $('[data-pin]', d).textContent = 'GP' + s.pin;
+    $('[data-pin]', d).textContent = pinName(+s.pin);
     const out = $('[data-out]', d); out.textContent = `${round(a)}° · ${angleToUs(id, a)} µs${id in state.overrides ? ' · direct' : ''}`;
     out.className = 'tag' + (id in state.overrides ? ' err' : '');
     $('[data-raw]', d).textContent = round(a) + '°';
@@ -2114,72 +2193,76 @@ function buildLimitTable() {
 /* =====================================================================
    Pins UI
    ===================================================================== */
-const pwmOf = p => `${(p >> 1) & 7}${p & 1 ? 'B' : 'A'}`;
 function pinProblems() {
   const msgs = [], bad = new Set();
-  const uses = SERVOS.map(s => ({ who: s.name, pin: +cfg.servos[s.id].pin, pwm: true }));
-  if (cfg.led.enabled) uses.push({ who: 'NeoPixel', pin: +cfg.led.pin, pwm: false });
+  const uses = SERVOS.map(s => ({ who: s.name, pin: +cfg.servos[s.id].pin }));
+  if (cfg.led.enabled) uses.push({ who: 'NeoPixel', pin: +cfg.led.pin });
   for (let i = 0; i < uses.length; i++) for (let k = i + 1; k < uses.length; k++) {
     const a = uses[i], b = uses[k];
-    if (a.pin === b.pin) { msgs.push(['err', `${a.who} and ${b.who} are both on GP${a.pin}.`]); bad.add(a.who); bad.add(b.who); }
-    else if (a.pwm && b.pwm && pwmOf(a.pin) === pwmOf(b.pin)) { msgs.push(['err', `${a.who} (GP${a.pin}) and ${b.who} (GP${b.pin}) share PWM channel ${pwmOf(a.pin)} — they would always output the same pulse.`]); bad.add(a.who); bad.add(b.who); }
+    if (a.pin === b.pin) { msgs.push(['err', `${a.who} and ${b.who} are both on ${pinName(a.pin)}.`]); bad.add(a.who); bad.add(b.who); }
   }
-  for (const u of uses) if (!PICO_PINS.includes(u.pin)) { msgs.push(['err', `${u.who}: GP${u.pin} is not available on the Pico W.`]); bad.add(u.who); }
-  return { msgs, bad };
+  for (const u of uses) {
+    if (!BOARD_PINS.includes(u.pin)) { msgs.push(['err', `${u.who}: pin ${u.pin} can't be used on the Uno (D0/D1 are the USB serial port).`]); bad.add(u.who); }
+    else if (u.pin === 13 && u.who !== 'NeoPixel') msgs.push(['warn', `${u.who} is on D13, which blinks while the Uno starts: the servo may twitch at power-up.`]);
+  }
+  return { msgs, bad, errors: msgs.filter(m => m[0] === 'err').length };
 }
-function pinOptions(sel) { return PICO_PINS.map(p => `<option value="${p}"${+sel === p ? ' selected' : ''}>GP${p}</option>`).join(''); }
+function pinOptions(sel) { return BOARD_PINS.map(p => `<option value="${p}"${+sel === p ? ' selected' : ''}>${pinName(p)}</option>`).join(''); }
 function buildPins() {
   const t = $('#pinTable');
-  t.innerHTML = '<tr><th>Output</th><th>Type</th><th>GPIO</th><th>PWM</th><th>Wire</th><th></th></tr>' +
+  t.innerHTML = '<tr><th>Output</th><th>Type</th><th>Pin</th><th>Wire</th><th></th></tr>' +
     SERVOS.map(s => `<tr data-who="${esc(s.name)}"><td><b>${s.name} servo</b></td><td><span class="tag">${s.type}</span></td>
-      <td><select data-bind="servos.${s.id}.pin" data-num>${pinOptions(cfg.servos[s.id].pin)}</select></td><td class="mono small" data-pwm></td>
+      <td><select data-bind="servos.${s.id}.pin" data-num>${pinOptions(cfg.servos[s.id].pin)}</select></td>
       <td class="small muted">Signal wire (orange or yellow)</td><td data-st></td></tr>`).join('') +
     `<tr data-who="NeoPixel"><td><b>NeoPixel data</b> <span class="small muted">(optional)</span></td><td><span class="tag" id="pinLedType"></span></td>
-      <td><select data-bind="led.pin" data-num>${pinOptions(cfg.led.pin)}</select></td><td class="mono small">PIO</td>
+      <td><select data-bind="led.pin" data-num>${pinOptions(cfg.led.pin)}</select></td>
       <td class="small muted">Data in, with a 330 Ω resistor in series</td><td data-st></td></tr>`;
   bindAll(t);
   $('#ledPin').innerHTML = pinOptions(cfg.led.pin);
   refreshPins();
 }
 function refreshPins() {
-  const { msgs, bad } = pinProblems();
+  const { msgs, bad, errors } = pinProblems();
   for (const tr of $$('#pinTable tr[data-who]')) {
     const who = tr.dataset.who, sv = SERVOS.find(s => s.name === who);
-    if (sv) $('[data-pwm]', tr).textContent = pwmOf(+cfg.servos[sv.id].pin);
     $('[data-st]', tr).innerHTML = bad.has(who) ? '<span class="tag err">conflict</span>' : '<span class="tag ok">ok</span>';
     const sel = $('select', tr); const want = sv ? cfg.servos[sv.id].pin : cfg.led.pin; if (+sel.value !== +want) sel.value = want;
   }
   $('#pinLedType').textContent = cfg.led.type;
   $('#pinMsgs').innerHTML = msgs.map(([c, m]) => `<div class="note ${c}">${esc(m)}</div>`).join('');
-  const st = $('#pinState'); st.textContent = msgs.length ? `${msgs.length} problem${msgs.length > 1 ? 's' : ''}` : 'valid'; st.className = 'tag ' + (msgs.length ? 'err' : 'ok');
-  $('#pinApply').disabled = msgs.length > 0;
+  const st = $('#pinState'); st.textContent = errors ? `${errors} problem${errors > 1 ? 's' : ''}` : msgs.length ? 'valid · check note' : 'valid'; st.className = 'tag ' + (errors ? 'err' : 'ok');
+  $('#pinApply').disabled = errors > 0;
   drawPinout();
   $$('#calServos details').length && refreshCalInfo();
 }
-function drawPinout() {
-  const left = ['GP0', 'GP1', 'GND', 'GP2', 'GP3', 'GP4', 'GP5', 'GND', 'GP6', 'GP7', 'GP8', 'GP9', 'GND', 'GP10', 'GP11', 'GP12', 'GP13', 'GND', 'GP14', 'GP15'];
-  const right = ['VBUS', 'VSYS', 'GND', '3V3_EN', '3V3', 'ADC_VREF', 'GP28', 'AGND', 'GP27', 'GP26', 'RUN', 'GP22', 'GND', 'GP21', 'GP20', 'GP19', 'GP18', 'GND', 'GP17', 'GP16'];
+function drawPinout() {                     // Arduino Uno R3, top view, USB on the left
   const assigned = {};
-  for (const s of SERVOS) (assigned['GP' + cfg.servos[s.id].pin] ||= []).push(s.name);
-  if (cfg.led.enabled) (assigned['GP' + cfg.led.pin] ||= []).push('NeoPixel');
-  const bx = 200, bw = 120, top = 26, dy = 14.4;
-  let s = `<rect x="${bx}" y="8" width="${bw}" height="${top + dy * 20}" rx="8" fill="#1f7a3a" stroke="#14532a"/>
-    <rect x="${bx + bw / 2 - 16}" y="0" width="32" height="18" rx="3" fill="#b8bec6" stroke="#8a9199"/>
-    <rect x="${bx + 35}" y="${top + 60}" width="50" height="50" rx="3" fill="#202326"/>
-    <text x="${bx + bw / 2}" y="${top + 128}" text-anchor="middle" style="fill:#cfe8d6;font-size:9px">RP2040</text>
-    <rect x="${bx + 30}" y="${top + 190}" width="60" height="44" rx="3" fill="#c3c8ce" stroke="#9aa1a8"/>
-    <text x="${bx + bw / 2}" y="${top + 216}" text-anchor="middle" style="fill:#333;font-size:9px">CYW43439</text>`;
-  const pin = (x, y, name, num, side) => {
-    const a = assigned[name], power = /GND|V|3V3|RUN|ADC/.test(name);
-    const fill = a ? (a.length > 1 ? 'var(--danger)' : 'var(--accent)') : power ? (name.includes('GND') ? '#333' : '#c0392b') : '#d4b25c';
-    s += `<circle cx="${x}" cy="${y}" r="4.6" fill="${fill}" stroke="#0d3b1d"/>`;
-    const tx = side === 'L' ? x - 10 : x + 10, anchor = side === 'L' ? 'end' : 'start';
-    s += `<text x="${tx}" y="${y + 3}" text-anchor="${anchor}">${name}</text>`;
-    s += `<text x="${side === 'L' ? x + 9 : x - 9}" y="${y + 3}" text-anchor="${side === 'L' ? 'start' : 'end'}" style="fill:#cfe8d6;font-size:7.5px">${num}</text>`;
-    if (a) s += `<text class="lbl" x="${side === 'L' ? tx - 46 : tx + 46}" y="${y + 3}" text-anchor="${anchor}" style="fill:${a.length > 1 ? 'var(--danger)' : 'var(--accent)'}">${esc(a.join(' + '))}</text>`;
+  for (const s of SERVOS) (assigned[pinName(+cfg.servos[s.id].pin)] ||= []).push(s.name);
+  if (cfg.led.enabled) (assigned[pinName(+cfg.led.pin)] ||= []).push('NeoPixel');
+  const bx = 40, by = 100, bw = 470, bh = 190, dx = 19.5;
+  let s = `<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="10" fill="#0b7d86" stroke="#075a61"/>
+    <rect x="${bx - 22}" y="${by + 28}" width="62" height="48" rx="3" fill="#c3c8ce" stroke="#8a9199"/>
+    <text x="${bx + 9}" y="${by + 56}" text-anchor="middle" style="fill:#333;font-size:9px">USB</text>
+    <rect x="${bx - 12}" y="${by + 128}" width="52" height="40" rx="3" fill="#202326"/>
+    <rect x="${bx + 250}" y="${by + 95}" width="150" height="34" rx="3" fill="#202326"/>
+    <text x="${bx + 325}" y="${by + 116}" text-anchor="middle" style="fill:#cfd6dc;font-size:9px">ATmega328P</text>
+    <text x="${bx + 160}" y="${by + 105}" text-anchor="middle" style="fill:#e8f6f7;font-size:22px;font-weight:800;font-family:system-ui">UNO</text>`;
+  const pin = (x, y, name, label, top) => {
+    const a = assigned[name], power = /GND|5V|3\.3V|VIN|IOREF|RESET|AREF/.test(name);
+    const fill = a ? (a.length > 1 ? 'var(--danger)' : 'var(--accent)') : power ? (name.includes('GND') ? '#333' : '#c0392b') : '#1d1f22';
+    s += `<rect x="${x - 6}" y="${y - 6}" width="12" height="12" rx="2" fill="${fill}" stroke="#e8eaed" stroke-width="1"/>`;
+    s += `<text x="${x}" y="${top ? y + 18 : y - 11}" text-anchor="middle" style="fill:#e8f6f7;font-size:8px">${label}</text>`;
+    if (a) s += `<text class="lbl" transform="translate(${x + 3},${top ? y - 12 : y + 15}) rotate(${top ? -50 : 50})" text-anchor="${top ? 'start' : 'start'}" style="fill:${a.length > 1 ? 'var(--danger)' : 'var(--accent)'}">${esc(a.join(' + '))}</text>`;
   };
-  left.forEach((n, i) => pin(bx + 8, top + i * dy + 8, n, i + 1, 'L'));
-  right.forEach((n, i) => pin(bx + bw - 8, top + i * dy + 8, n, 40 - i, 'R'));
+  // top header, right to left: D0…D7 | D8…D13, GND, AREF, SDA, SCL
+  const top = ['D0', 'D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', null, 'D8', 'D9', 'D10', 'D11', 'D12', 'D13', 'GND', 'AREF', 'SDA', 'SCL'];
+  const pwm = new Set(['D3', 'D5', 'D6', 'D9', 'D10', 'D11']);
+  let x = bx + bw - 16;
+  for (const n of top) { if (!n) { x -= 10; continue; } pin(x, by + 12, n, n === 'D0' ? 'RX0' : n === 'D1' ? 'TX1' : n.startsWith('D') ? (pwm.has(n) ? '~' : '') + n.slice(1) : n, true); x -= dx; }
+  // bottom header, left to right: power | A0…A5
+  const bottom = ['IOREF', 'RESET', '3.3V', '5V', 'GND', 'GND', 'VIN', null, 'A0', 'A1', 'A2', 'A3', 'A4', 'A5'];
+  x = bx + 190;
+  for (const n of bottom) { if (!n) { x += 10; continue; } pin(x, by + bh - 12, n, n === '3.3V' ? '3V3' : n === 'IOREF' ? 'IOR' : n === 'RESET' ? 'RST' : n, false); x += dx; }
   $('#pinout').innerHTML = s;
 }
 
@@ -2216,7 +2299,7 @@ function liveLedSend() {
   clearTimeout(ledSendT);
   ledSendT = setTimeout(() => { if (link.connected) link.send(ledPacket(false)); }, 150);
 }
-// Browser preview of the firmware's LED effects (same maths as render_led in main.py)
+// Browser preview of the firmware's LED effects (same idea as renderLeds() in armctl.ino)
 function wheel(p) { p = Math.floor(p) % 256; if (p < 0) p += 256; if (p < 85) return [255 - p * 3, p * 3, 0]; if (p < 170) { p -= 85; return [0, 255 - p * 3, p * 3]; } p -= 170; return [p * 3, 0, 255 - p * 3]; }
 let ledT = 0, ledLast = 0;
 function renderLedPreview(now) {
@@ -2298,7 +2381,7 @@ function connHint() {
   const ok = 'serial' in navigator, t = $('#serialSupport');
   t.textContent = ok ? 'Web Serial ready' : 'not supported here'; t.className = 'tag ' + (ok ? 'ok' : 'err');
   $('#connHint').textContent = ok
-    ? 'Plug the Pico into this computer with a USB data cable and click “Connect USB”. Close Thonny first — only one program can use the port. Commands are only sent in Live mode.'
+    ? 'Plug the Arduino Uno into this computer with a USB cable and click “Connect USB”. Close the Arduino IDE’s Serial Monitor first — only one program can use the port. Commands are only sent in Live mode.'
     : 'This browser can’t talk to USB devices. Use Chrome or Edge on a computer (Windows, macOS, Linux, ChromeOS). The simulator works everywhere.';
 }
 
@@ -2676,11 +2759,17 @@ function download(name, text, type = 'text/plain') {
   document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
 }
 function firmware() {
-  const pk = cfgPacket(false), lp = ledPacket(false);
-  const fwCfg = { servos: pk.servos, led: pk.led, fx: lp.fx, timeout: pk.timeout };
-  if (pinProblems().msgs.length) { toast('Fix the pin conflicts first'); return null; }
+  if (pinProblems().errors) { toast('Fix the pin conflicts first'); return null; }
+  const pk = cfgPacket(false), f = ledPacket(false).fx, L = pk.led;
+  const servos = pk.servos.map(s => `{${s.pin}, ${s.min}, ${s.max}, ${s.slew}}`).join(', ');
+  const fx = [Math.max(0, LED_MODES.indexOf(f.mode)), ...f.c1, ...f.c2, f.bri, f.speed].join(', ');
+  const body = `${pk.timeout}, { ${servos} }, ${L.pin}, ${L.count}, ${L.bpp}, ${L.timing}, "${L.order.replace(/[^RGBW]/g, '')}", { ${fx} }`;
+  let h = 0x5A17; for (const ch of body) h = (h * 31 + ch.charCodeAt(0)) & 0xffff;      // EEPROM tag for exactly these settings
+  const magic = '0x' + h.toString(16).toUpperCase().padStart(4, '0');
   return $('#fwTemplate').textContent.replace(/^\n/, '')
-    .replace('{{CFG}}', () => JSON.stringify(fwCfg).replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
+    .replace('{{USE_NEOPIXEL}}', cfg.led.enabled ? '1' : '0')
+    .replace('{{MAGIC}}', magic)
+    .replace('{{CFG}}', `{ ${magic}, ${body} }`);
 }
 
 /* =====================================================================
@@ -2737,7 +2826,7 @@ function setupEvents() {
   });
   // pins
   $('#pinApply').addEventListener('click', () => {
-    if (!link.connected) { toast('Connect to the Pico first (pins are also saved here and in the firmware export)'); return; }
+    if (!link.connected) { toast('Connect to the Arduino first (pins are also saved here and in the firmware download)'); return; }
     link.send(cfgPacket($('#pinSave').checked)); link.lastSent = ''; toast('Pin configuration sent');
   });
   $('#pinDefaults').addEventListener('click', () => {
@@ -2746,11 +2835,11 @@ function setupEvents() {
   });
   // leds
   $('#ledApply').addEventListener('click', () => {
-    if (!link.connected) { toast('Connect to the Pico first'); return; }
-    link.send(cfgPacket(true)); link.send(ledPacket(true)); toast('LED settings sent and saved on the Pico');
+    if (!link.connected) { toast('Connect to the Arduino first'); return; }
+    link.send(cfgPacket(true)); link.send(ledPacket(true)); toast('LED settings sent and saved on the Arduino');
   });
   // settings
-  $('#fwDownload').addEventListener('click', () => { const t = firmware(); if (t) { download('main.py', t, 'text/x-python'); toast('main.py downloaded'); } });
+  $('#fwDownload').addEventListener('click', () => { const t = firmware(); if (t) { download('armctl.ino', t, 'text/plain'); toast('armctl.ino downloaded — open it in the Arduino IDE and upload'); } });
   $('#cfgExport').addEventListener('click', () => download('armctl-settings.json', JSON.stringify(cfg, null, 2), 'application/json'));
   $('#cfgImport').addEventListener('click', () => $('#cfgFile').click());
   $('#cfgFile').addEventListener('change', async e => {
@@ -2765,10 +2854,11 @@ function setupEvents() {
     clearTimeout(saveTimer); location.reload();
   });
   $('#logClear').addEventListener('click', () => $('#console').innerHTML = '');
-  $('#picoReset').addEventListener('click', () => { if (!link.connected) { toast('Not connected'); return; } link.raw('\x03\x03\x04'); log('Restarting main.py on the Pico…'); setTimeout(() => { link.send({ t: 'hello' }); link.send(cfgPacket(false)); link.send(ledPacket(false)); link.lastSent = ''; }, 1500); });
+  $('#boardReset').addEventListener('click', () => link.restart());
   $('#rawSend').addEventListener('click', () => {
     const v = $('#rawCmd').value.trim(); if (!v) return;
-    try { if (!link.send(JSON.parse(v))) toast('Not connected'); } catch (e) { toast('Not valid JSON'); }
+    if (!link.connected) { toast('Not connected'); return; }
+    link.raw(v + '\n'); log('→ ' + v, 'tx');
   });
 
   // keyboard

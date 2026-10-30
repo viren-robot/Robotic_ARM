@@ -1,18 +1,18 @@
 # ArmCtl — Robotic Arm Control Website
 
-A single-file web app (`index.html`) to control a 4-axis 3D-printed robotic arm driven by **4× MG90S** servos and a Raspberry Pi Pico (or Pico W) **over USB**.
+A single-file web app (`index.html`) to control a 4-axis 3D-printed robotic arm driven by **4× MG90S** servos and an **Arduino Uno** over **USB**.
 
 The arm is the "Robotic arm - brazo robótico" frame (8 printed parts): base, arm base, upper arm, forearm, gripper adapter, gripper base, gripper rack and gear.
 
-| Connection | Pico pin | Wire |
-|------------|----------|------|
-| Base servo (MG90S, −90…90°) | GP0 | Signal wire, orange or yellow |
-| Shoulder servo (MG90S, −45…85°) | GP2 | Signal wire |
-| Elbow servo (MG90S, −60…90°) | GP4 | Signal wire |
-| Gripper servo (MG90S, 0…100 %, ~21 mm jaw travel) | GP6 | Signal wire |
-| NeoPixel data (optional) | GP15 | Add a 330 Ω resistor in series with the data line |
+| Connection | Uno pin | Wire |
+|------------|---------|------|
+| Base servo (MG90S, −90…90°) | D3 | Signal wire, orange or yellow |
+| Shoulder servo (MG90S, −45…85°) | D5 | Signal wire |
+| Elbow servo (MG90S, −60…90°) | D6 | Signal wire |
+| Gripper servo (MG90S, 0…100 %, ~21 mm jaw travel) | D9 | Signal wire |
+| NeoPixel data (optional, off by default) | D7 | Add a 330 Ω resistor in series with the data line |
 
-Pins and limits can be changed in the page.
+Pins and limits can be changed in the page. Any of D2–D13 and A0–A5 can be used; D0/D1 are the USB serial port.
 
 ## Features
 
@@ -36,11 +36,12 @@ Pins and limits can be changed in the page.
   - **Joint limits** and calibrated servo **min/max angles** are never exceeded.
   - **Smooth motion**: speed and acceleration limits.
   - **Animation check**: animations with red segments (too fast, unreachable, collision) can't play on the real arm.
-  - **On the Pico** (`main.py`):
+  - **On the Arduino** (`armctl.ino`):
     - Every pulse is clamped to the servo's range.
     - A speed limit applies even if the page sends a jump.
-    - The Pico holds position if commands stop (USB unplugged, page closed).
+    - The Arduino holds position if commands stop (USB unplugged, page closed).
     - **E-STOP** freezes the arm in place (or optionally releases the servos).
+  - **Power check**: the page warns if the Uno restarts by itself, which almost always means the servos are powered from the Uno.
 - **Calibration** of servo centres, directions, limits and home pose. **Pin assignments** with a pinout diagram. **NeoPixel** LED control.
 - **E-STOP** button (or press `Esc`). Light and dark themes. Works on phones (simulator only: phones have no Web Serial).
 
@@ -49,9 +50,9 @@ Arm dimensions, measured between the servo shafts in the STL files: shoulder axi
 ## Quick start
 
 1. Open `index.html` in **Chrome or Edge** on a computer. It starts in **Simulator** mode. Try the Animate tab.
-2. Install MicroPython on the Pico: hold BOOTSEL while plugging it in, then copy the MicroPython `.uf2` onto it.
-3. In the page, go to **Settings → Pico firmware** and click **Download main.py**. Save it onto the Pico as `main.py` (e.g. with Thonny), then close Thonny.
-4. Click **Connect USB**, pick the Pico, and switch to **Live**.
+2. Install the **Arduino IDE**. If you want NeoPixels, also install the **Adafruit NeoPixel** library (Sketch → Include Library → Manage Libraries).
+3. In the page, go to **Settings → Arduino firmware** and click **Download armctl.ino**. Open it in the Arduino IDE (let it create the `armctl` folder), choose **Tools → Board → Arduino Uno** and your port, and click **Upload**.
+4. Close the IDE's Serial Monitor, click **Connect USB** in the page, pick the Uno, and switch to **Live**. The Uno restarts when the page connects; the page waits about 2 seconds for it.
 5. Calibrate each servo in the **Calibration** tab. Ideally do this before fitting the horns: drive the servo to its center, then fit the horn with the joint at its zero position.
 
 ## Keyboard
@@ -67,15 +68,22 @@ Arm dimensions, measured between the servo shafts in the STL files: shoulder axi
 
 ## Wiring
 
-- **Servo signal wires** (orange or yellow): GP0 base, GP2 shoulder, GP4 elbow, GP6 gripper.
-- **Servo power:** red wires to +5 V and brown/black wires to ground, from a separate 5 V supply (≥ 3 A), not from the Pico or USB.
-- **Common ground:** connect the supply's ground to a Pico GND pin.
-- **NeoPixel (optional):** data line to GP15 through a 330 Ω resistor.
+- **Servo signal wires** (orange or yellow): D3 base, D5 shoulder, D6 elbow, D9 gripper.
+- **Servo power:** red wires to +5 V and brown/black wires to ground, from a separate 5 V supply (≥ 3 A). Not from the Uno's 5V pin or USB: the Uno would brown out and restart.
+- **Common ground:** connect the supply's ground to a GND pin on the Uno.
+- **NeoPixel (optional):** data line to D7 through a 330 Ω resistor. At most 60 LEDs (the Uno has 2 KB of RAM).
 
 ## USB protocol
 
-One JSON object per line:
+115200 baud. The page sends one short text command per line, and the Uno answers with JSON lines.
 
-- `{"t":"pos","us":[…4 pulse widths…]}` sets the four servo pulse widths.
-- `{"t":"off"}` releases the servos.
-- `cfg`, `led`, `ping` and `hello` handle setup and the keep-alive.
+| Command | Meaning |
+|---|---|
+| `P b s e g` | Servo pulse widths in µs (base, shoulder, elbow, gripper) |
+| `S 0` / `S 1` | E-STOP: freeze in place / release the servos |
+| `R` | Reset the E-STOP |
+| `H` | Hold still |
+| `C save timeout n [pin min max slew]… ledPin ledCount bpp khz800 order` | Settings (`save 1` stores them in EEPROM) |
+| `L save effect r g b w r g b w brightness speed` | NeoPixel effect |
+| `?` | Hello (firmware version) |
+| `p id` | Ping |
