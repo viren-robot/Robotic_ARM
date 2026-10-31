@@ -42,6 +42,7 @@ Pins and limits can be changed in the page.
     - The Pico holds position if commands stop (USB unplugged, page closed).
     - **E-STOP** freezes the arm in place (or optionally releases the servos).
 - **Calibration** of servo centres, directions, limits and home pose. **Pin assignments** with a pinout diagram. **NeoPixel** LED control.
+- **Assembly guide** (Assembly tab): 11 steps in the 3D view. The parts for each step slide into place in blue, the camera follows, and the last step plays a test movement. Includes a button that moves the servos to the assembly position before you fit the horns.
 - **main.py upload from the page**: one click copies the firmware onto the Pico over USB, no Thonny needed.
 - **E-STOP** button (or press `Esc`). Light and dark themes. Works on phones (simulator only: phones have no Web Serial).
 
@@ -53,7 +54,8 @@ Arm dimensions, measured between the servo shafts in the STL files: shoulder axi
 2. Install MicroPython on the Pico (once): hold BOOTSEL while plugging it in, then copy the MicroPython `.uf2` ([micropython.org](https://micropython.org/download/RPI_PICO/), or RPI_PICO_W for a Pico W) onto the RPI-RP2 drive.
 3. In the page, go to **Settings → Pico firmware** and click **Upload to Pico**. The page copies `main.py` onto the Pico over USB (no Thonny needed), checks it, starts it and connects. Close Thonny first if it's open. To copy it by hand instead, use "Copy main.py yourself instead" in the same card.
 4. Switch to **Live**. Next time, just click **Connect USB**.
-5. Calibrate each servo in the **Calibration** tab. Ideally do this before fitting the horns: drive the servo to its center, then fit the horn with the joint at its zero position.
+5. Building the arm? Follow the **Assembly** tab step by step.
+6. Calibrate each servo in the **Calibration** tab. Ideally do this before fitting the horns: drive the servo to its center, then fit the horn with the joint at its zero position.
 
 ## Built-in main.py uploader
 

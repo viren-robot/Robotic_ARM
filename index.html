@@ -156,6 +156,17 @@ main { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(380px, 1fr
 .warnbox { color: #fff; background: var(--danger); border-radius: 7px; padding: 5px 9px; font-weight: 600; display: none; }
 .hud { text-align: center; font-weight: 600; display: none; }
 .hud big { font-size: 20px; display: block; }
+.asmhud { font-weight: 600; text-align: center; white-space: nowrap; }
+.viewer.asm #readout, .viewer.asm #warnBox, .viewer.asm #modeBadge, .viewer.asm #hud { display: none !important; }
+.asmtext p { margin: 0 0 8px; }
+.asmtext ul, .asmtext ol { margin: 0 0 8px; padding-left: 18px; }
+.asmtext li { margin: 2px 0; }
+.asmtext .tip { border-left: 3px solid var(--blue); background: var(--blue-weak); padding: 6px 9px; border-radius: 0 6px 6px 0; margin: 8px 0; }
+.asmtext .warn { border-left-color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); }
+.list.asmlist { max-height: none; }
+.asmlist .item { cursor: pointer; }
+.asmlist .num { font-family: var(--mono); font-size: 11px; color: var(--muted); width: 20px; text-align: right; }
+.asmlist .item.done .name { color: var(--muted); font-weight: 450; }
 
 /* ---------- joints ---------- */
 .jrow { padding: 8px 0; border-bottom: 1px dashed var(--border); }
@@ -253,7 +264,7 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
       <div class="glass readout" id="readout"></div>
       <div class="warnbox" id="warnBox"></div>
     </div>
-    <div class="ov tc"><div class="glass hud" id="hud"></div></div>
+    <div class="ov tc"><div class="glass hud" id="hud"></div><div class="glass asmhud" id="asmHud" hidden></div></div>
     <div class="ov tr">
       <button class="btn sm" data-cam="iso">3D</button>
       <button class="btn sm" data-cam="front">Front</button>
@@ -271,6 +282,7 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
       <button data-tab="anim">Animate</button>
       <button data-tab="sim">Simulator</button>
       <button data-tab="safety">Safety</button>
+      <button data-tab="asm">Assembly</button>
       <button data-tab="calib">Calibration</button>
       <button data-tab="pins">Pin assignments</button>
       <button data-tab="leds">NeoPixel</button>
@@ -479,6 +491,24 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
     </div>
 
     <!-- ================= CALIBRATION ================= -->
+    <div class="panel" id="tab-asm">
+      <div class="card">
+        <div class="head"><h3 id="asmTitle">Assembly</h3><span class="tag" id="asmCount"></span></div>
+        <div class="asmtext small" id="asmText"></div>
+        <div class="row" style="margin-top:12px">
+          <button class="btn sm" id="asmPrev">‹ Back</button>
+          <button class="btn sm primary" id="asmNext">Next ›</button>
+          <span class="grow"></span>
+          <button class="btn sm ghost" id="asmReplay" title="Show the parts sliding into place again">Replay</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="head"><h3>Steps</h3><label class="chk small"><input type="checkbox" id="asmGhost"> Show parts still to come</label></div>
+        <div class="list asmlist" id="asmList"></div>
+        <p class="small muted" id="asm2d" hidden>The 3D model needs three.js from the internet; the steps still work without it.</p>
+      </div>
+    </div>
+
     <div class="panel" id="tab-calib">
       <div class="card">
         <div class="head"><h3>How to calibrate</h3></div>
@@ -1049,6 +1079,7 @@ const DEFAULT_CFG = {
   anims: DEMO_ANIMS,
   animSel: 0,
   animGap: 1,
+  asm: { step: 0, ghost: true },
 };
 // Settings from the earlier 6-axis version of this page don't fit this arm: drop its hardware settings
 const HW_KEYS = ['joints', 'servos', 'geometry', 'wristMode', 'typeSpeed', 'poses', 'sequence', 'practice'];
@@ -2486,7 +2517,8 @@ function partGeometry(name) {
   return (partGeo[name] = g);
 }
 // Builds the arm with the same joint chain as fk(). Units: mm, Z up.
-function buildArm(ghostMat) {
+// tag(name, obj): the assembly guide wraps each physical part so it can move and highlight it on its own.
+function buildArm(ghostMat, tag = (n, o) => o) {
   const M = view.mats, F = FRAME;
   const mat = k => ghostMat || M[k];
   const shadow = m => { if (!ghostMat) m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } }); return m; };
@@ -2514,31 +2546,34 @@ function buildArm(ghostMat) {
   const group = new THREE.Group();
 
   // fixed base with the base servo standing in it, shaft up
-  part(group, 'base', 'dark', Y_UP);
-  const bs = mg90s(group); bs.position.z = F.turntable - 4.5;
+  tag('base', part(group, 'base', 'dark', Y_UP));
+  const bs = mg90s(group); bs.position.z = F.turntable - 4.5; tag('baseServo', bs);
   // turntable: arm base + shoulder servo
   const turret = new THREE.Group(); turret.position.z = F.turntable; group.add(turret);
-  horn(turret, 0, 0, -1, 'z');
-  part(turret, 'base_brazo', 'dark', Y_UP);
+  tag('baseHorn', horn(turret, 0, 0, -1, 'z'));
+  tag('armBase', part(turret, 'base_brazo', 'dark', Y_UP));
   const [sx, , sz] = F.shoulder;
   const ss = mg90s(turret);                          // body inside the upright, tower through its window, shaft along -Y
   ss.position.set(sx, -6, sz); ss.rotation.set(Math.PI / 2, -112 * D2R, 0, 'YXZ');   // body tilted 22° like the window
+  tag('shoulderServo', ss);
   // shoulder -> upper arm
   const shoulder = new THREE.Group(); shoulder.position.set(sx, 0, sz); turret.add(shoulder);
-  horn(shoulder, 0, -15.3, 0, 'y');
-  part(shoulder, 'brazo', 'accent', F.upperArm);
+  tag('shoulderHorn', horn(shoulder, 0, -15.3, 0, 'y'));
+  tag('upperArm', part(shoulder, 'brazo', 'accent', F.upperArm));
   // elbow -> forearm (the elbow servo rides in the forearm) -> gripper
   const elbow = new THREE.Group(); elbow.position.z = F.L1; shoulder.add(elbow);
-  horn(elbow, 0, -22.8, 0, 'y');
-  const fore = part(elbow, 'antebrazo', 'accent', F.forearm);
+  tag('elbowHorn', horn(elbow, 0, -22.8, 0, 'y'));
+  const fore = tag('forearm', part(elbow, 'antebrazo', 'accent', F.forearm));
   const es = mg90s(fore); es.position.set(-74, 2, 0.4); es.rotation.set(Math.PI / 2, Math.PI, 0, 'YXZ');   // shaft towards the upper arm
-  const adapter = part(fore, 'adaptador_pinza_base', 'link', F.adapter);
-  const grip = part(adapter, 'pinza_base', 'link', F.gripper);
+  tag('elbowServo', es);
+  const adapter = tag('adapter', part(fore, 'adaptador_pinza_base', 'link', F.adapter));
+  const grip = tag('gripperBase', part(adapter, 'pinza_base', 'link', F.gripper));
   const gs = mg90s(grip); gs.position.set(5.5, 13, -5.15);  // flange behind the posts, shaft forward into the gear
+  tag('gripperServo', gs);
   const gear = new THREE.Group(); gear.position.set(5.5, 13, 0.5); grip.add(gear);
-  part(gear, 'pinza_engranaje', 'hub', [[1, 0, 0], [0, 0, 1], [0, -1, 0], [0, 0, 0]]);
+  tag('gear', part(gear, 'pinza_engranaje', 'hub', [[1, 0, 0], [0, 0, 1], [0, -1, 0], [0, 0, 0]]));
   const rack = new THREE.Group(); grip.add(rack);
-  part(rack, 'pinza_corredera', 'link', [[1, 0, 0], [0, 1, 0], [0, 0, 1], [0, 0, 3.5]]);
+  tag('rack', part(rack, 'pinza_corredera', 'link', [[1, 0, 0], [0, 1, 0], [0, 0, 1], [0, 0, 3.5]]));
   return { group, turret, shoulder, elbow, gear, rack };
 }
 function poseModel(m, q) {
@@ -2571,6 +2606,7 @@ function updateTargets() {
 }
 function render3D(now) {
   if (!view.ready) { if (view.ctx) render2D(); return; }
+  if (asm.on) { asmFrame(now); view.controls.update(); view.renderer.render(view.scene, view.camera); return; }
   poseModel(view.arm, state.current);
   const showCmd = cfg.sim.ghost && JOINTS.some(j => Math.abs(state.current[j.id] - state.target[j.id]) > 1);
   view.ghost.group.visible = showCmd; if (showCmd) poseModel(view.ghost, state.target);
@@ -2589,6 +2625,215 @@ function render3D(now) {
   view.mats.accent.emissive.setHex(hit ? 0x661111 : 0x000000);
   view.controls.update();
   view.renderer.render(view.scene, view.camera);
+}
+
+/* =====================================================================
+   Assembly guide: builds a second copy of the arm part by part in the 3D view
+   ===================================================================== */
+// dir: where a part slides in from, in robot coordinates (x forward, y left, z up) or, with frame 'parent',
+// along its parent's axes (e.g. a servo shaft). dist in mm.
+const ASM_PARTS = {
+  base:          { name: 'Base',                 dir: [0, 0, 1], dist: 70 },
+  baseServo:     { name: 'Base servo (MG90S)',   dir: [0, 0, 1], dist: 70 },
+  baseHorn:      { name: 'Servo horn',           dir: [0, 0, 1], dist: 35 },
+  armBase:       { name: 'Arm base',             dir: [0, 0, 1], dist: 60 },
+  shoulderServo: { name: 'Shoulder servo',       dir: [0, 1, 0], dist: 60 },
+  shoulderHorn:  { name: 'Servo horn',           dir: [0, -1, 0], dist: 35 },
+  upperArm:      { name: 'Upper arm',            dir: [0, -1, 0], dist: 60 },
+  forearm:       { name: 'Forearm',              dir: [0, -1, 0], dist: 70 },
+  elbowServo:    { name: 'Elbow servo',          dir: [0, -1, 0], dist: 45 },
+  elbowHorn:     { name: 'Servo horn',           dir: [0, -1, 0], dist: 35 },
+  adapter:       { name: 'Gripper adapter',      dir: [1, 0, 0], dist: 50 },
+  gripperBase:   { name: 'Gripper base',         dir: [1, 0, 0], dist: 50 },
+  gripperServo:  { name: 'Gripper servo',        dir: [0, 0, -1], dist: 45, frame: 'parent' },
+  gear:          { name: 'Gear',                 dir: [0, 0, 1], dist: 35, frame: 'parent' },
+  rack:          { name: 'Rack (moving jaw)',    dir: [1, 0, 0], dist: 40, frame: 'parent' },
+};
+const ALL_PARTS = Object.keys(ASM_PARTS);
+const gp = id => 'GP' + cfg.servos[id].pin;
+const ASM_STEPS = [
+  { title: 'What you need', show: 'all', html: () => `
+    <p>The finished arm. Drag in the 3D view to look around it.</p>
+    <ul>
+      <li><b>8 printed parts:</b> base, arm base, upper arm, forearm, gripper adapter, gripper base, gear and rack.</li>
+      <li><b>4 × MG90S servos</b> with their horns and screws.</li>
+      <li><b>2 × M3 screws</b> (with nuts) for the gripper adapter.</li>
+      <li>The <b>Raspberry Pi Pico</b> with MicroPython, jumper wires, and a <b>5 V supply</b> for the servos.</li>
+      <li>A small screwdriver.</li>
+    </ul>
+    <div class="tip">Clean up the prints first: remove supports and check that the servos and horns fit their slots. Don't force a part — sand or trim it instead, or it may crack later.</div>` },
+  { title: 'Center the servos', parts: [], focus: ['baseServo', 'shoulderServo', 'elbowServo', 'gripperServo'], html: () => `
+    <p>Every horn and part goes on while its servo sits at the position that matches the arm's home pose. Then the arm's zero positions line up with the servos' and the joints can use their full range.</p>
+    <ol>
+      <li>Upload <code>main.py</code> to the Pico (Settings → Upload to Pico).</li>
+      <li>Plug the servos in: base → <b>${gp('base')}</b>, shoulder → <b>${gp('shoulder')}</b>, elbow → <b>${gp('elbow')}</b>, gripper → <b>${gp('gripper')}</b>. Power them as in the last step.</li>
+      <li>Switch to <b>Live</b>, connect, and click the button below. Leave the servos plugged in and don't turn their shafts by hand from now on.</li>
+    </ol>
+    <div class="row"><button class="btn sm primary" data-asm="center">Move servos to assembly position</button></div>
+    <div class="tip">The assembly position is: base facing forward, upper arm straight up, forearm horizontal and gripper half open.</div>` },
+  { title: 'Base servo', parts: ['base', 'baseServo'], html: () => `
+    <p>Put an MG90S into the <b>base</b>, shaft pointing up and centred, and lead its cable out of the base.</p>
+    <p>Fix it with the screws that came with the servo. Snug is enough — the plastic strips easily.</p>` },
+  { title: 'Arm base on the base servo', parts: ['baseHorn', 'armBase'], html: () => `
+    <p>Press a <b>horn</b> onto the base servo without turning the shaft, then fix the <b>arm base</b> to it so it faces forward, as shown.</p>
+    <p>Screw the horn to the shaft with the small centre screw.</p>
+    <div class="tip">The arm base must turn freely on top of the base without rubbing.</div>` },
+  { title: 'Shoulder servo', parts: ['shoulderServo'], html: () => `
+    <p>Fit the <b>shoulder servo</b> into the upright of the arm base, with its shaft coming out through the side window. Fix it with its screws.</p>` },
+  { title: 'Upper arm', parts: ['shoulderHorn', 'upperArm'], html: () => `
+    <p>Put a <b>horn</b> on the shoulder servo and fix the <b>upper arm</b> to it, pointing <b>straight up</b>. Add the horn's centre screw.</p>
+    <div class="tip warn">If the upper arm isn't quite vertical, take it off and move it by one spline tooth. Don't turn the servo to fix it.</div>` },
+  { title: 'Forearm and elbow servo', parts: ['forearm', 'elbowServo', 'elbowHorn'], html: () => `
+    <p>Fit the <b>elbow servo</b> into the <b>forearm</b>, shaft pointing towards the upper arm, and fix it with its screws.</p>
+    <p>Put a <b>horn</b> on its shaft and fix it to the top of the upper arm with the forearm <b>horizontal</b>, pointing forward. Add the centre screw.</p>` },
+  { title: 'Gripper adapter', parts: ['adapter'], html: () => `
+    <p>Bolt the <b>gripper adapter</b> to the end of the forearm with the <b>two M3 screws</b>.</p>` },
+  { title: 'Gripper base and servo', parts: ['gripperBase', 'gripperServo'], html: () => `
+    <p>Fix the <b>gripper base</b> to the adapter, then fit the <b>gripper servo</b> from behind so its shaft comes out between the posts.</p>` },
+  { title: 'Gear and jaw', parts: ['gear', 'rack'], html: () => `
+    <p>The gripper servo is at half open. Slide the <b>rack</b> (the moving jaw) in so the jaws are about half open, then press the <b>gear</b> onto the servo shaft so it meshes with the rack.</p>
+    <div class="tip">Check that the jaw slides without sticking. If it binds, the gripper servo will strain and get hot.</div>` },
+  { title: 'Wiring and first test', show: 'all', parts: [], test: true, html: () => `
+    <ul>
+      <li><b>Signal wires</b> (orange): base → ${gp('base')}, shoulder → ${gp('shoulder')}, elbow → ${gp('elbow')}, gripper → ${gp('gripper')}.</li>
+      <li><b>Servo power</b>: red wires to +5 V, brown wires to ground. For one servo, the Pico's VBUS pin is fine; for all four, use a separate 5 V supply (≥ 3 A). Never use the 3V3 pin.</li>
+      <li>Connect the supply's ground to a GND pin on the Pico.</li>
+      <li>Leave enough slack at every joint for its full movement and tie the cables down so they can't catch.</li>
+    </ul>
+    <p>Then fine-tune each servo in <b>Calibration</b> and try the arm slowly in <b>Live</b> mode, with one hand ready on <b>E-STOP</b> (Esc).</p>` },
+];
+
+const asm = { on: false, model: null, wraps: {}, step: 0, t: 0, testT: 0, cam: null, hint: '' };
+const easeOut = t => 1 - Math.pow(1 - clamp(t, 0, 1), 3);
+const asmShown = st => st.show === 'all' ? ALL_PARTS : ASM_STEPS.slice(0, ASM_STEPS.indexOf(st) + 1).flatMap(s => s.show === 'all' ? [] : s.parts || []);
+
+function asmBuild() {
+  if (asm.model || !view.ready) return;
+  const wraps = {};
+  const tag = (name, obj) => {                  // wrap the part in a group that slides it in
+    const meshes = []; obj.traverse(o => o.isMesh && meshes.push(o));
+    const w = new THREE.Group(), parent = obj.parent;
+    parent.remove(obj); w.add(obj); parent.add(w);
+    meshes.forEach(m => { m.userData.mat = m.material; m.geometry.boundingBox || m.geometry.computeBoundingBox(); });
+    wraps[name] = { w, meshes };
+    return obj;
+  };
+  const m = buildArm(null, tag);
+  m.group.visible = false; view.root.add(m.group);
+  asm.model = m; asm.wraps = wraps;
+  asm.hi = new Map();
+  asm.ghost = new THREE.MeshBasicMaterial({ color: 0x8b96a5, transparent: true, opacity: 0.13, depthWrite: false });
+}
+const asmHiMat = mat => {                       // parts of the current step are blue
+  if (!asm.hi.has(mat)) asm.hi.set(mat, new THREE.MeshStandardMaterial({ color: 0x3d8bff, emissive: 0x1d4ed8, emissiveIntensity: 0.3, roughness: 0.5, flatShading: mat.flatShading }));
+  return asm.hi.get(mat);
+};
+
+function asmEnter() {
+  asm.on = true;
+  $('#viewer').classList.add('asm');
+  asm.hint ||= $('#viewHint').innerHTML;
+  $('#viewHint').innerHTML = '<b>Blue</b> = parts for this step · drag to orbit · scroll to zoom · right-drag to pan';
+  $('#asm2d').hidden = !!view.ready || !view.ctx;
+  if (view.ready) { asmBuild(); asm.model.group.visible = true; }
+  asmGo(clamp(+cfg.asm.step || 0, 0, ASM_STEPS.length - 1), true);
+}
+function asmExit() {
+  if (!asm.on) return;
+  asm.on = false;
+  $('#viewer').classList.remove('asm');
+  $('#asmHud').hidden = true;
+  if (asm.hint) $('#viewHint').innerHTML = asm.hint;
+  if (asm.model) {
+    asm.model.group.visible = false;
+    view.arm.group.visible = true;
+    applyView(); updateAnimPath();
+  }
+}
+function asmGo(i, entering = false) {
+  i = clamp(i, 0, ASM_STEPS.length - 1);
+  const st = ASM_STEPS[i];
+  asm.step = i; asm.t = 0; asm.testT = 0;
+  if (cfg.asm.step !== i) { cfg.asm.step = i; saveCfg(); }
+  $('#asmTitle').textContent = st.title;
+  $('#asmCount').textContent = `Step ${i + 1} of ${ASM_STEPS.length}`;
+  $('#asmText').innerHTML = st.html();
+  $('#asmPrev').disabled = i === 0;
+  $('#asmNext').textContent = i === ASM_STEPS.length - 1 ? 'Start again' : 'Next ›';
+  $('#asmReplay').disabled = !(st.parts || []).length;
+  $('#asmGhost').checked = !!cfg.asm.ghost;
+  const hud = $('#asmHud'); hud.hidden = !asm.on; hud.textContent = `${i + 1} / ${ASM_STEPS.length} · ${st.title}`;
+  $('#asmList').innerHTML = ASM_STEPS.map((s, k) =>
+    `<div class="item${k === i ? ' playing' : k < i ? ' done' : ''}" data-step="${k}"><span class="num">${k + 1}</span><span class="name">${esc(s.title)}</span>${k < i ? '<span class="tag ok">✓</span>' : ''}</div>`).join('');
+  if (asm.model) { asmFrame(performance.now(), 0); asmFrameCamera(entering); }
+}
+// camera: keep the current viewing direction, move to frame the step's new parts (or the whole arm)
+function asmFrameCamera(entering) {
+  const st = ASM_STEPS[asm.step], names = [st.parts, st.focus].find(l => l?.length) || (st.show === 'all' ? ALL_PARTS : asmShown(st));
+  const box = new THREE.Box3(), b = new THREE.Box3();
+  view.root.updateMatrixWorld(true);
+  for (const n of names) for (const m of asm.wraps[n].meshes) box.union(b.copy(m.geometry.boundingBox).applyMatrix4(m.matrixWorld));
+  if (box.isEmpty()) return;
+  const c = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3()).length();
+  const dist = clamp(size * 1.25 + 80, 170, 480);
+  let dir = view.camera.position.clone().sub(view.controls.target).normalize();
+  if (entering || dir.y < 0.15) dir = new THREE.Vector3(300, 240, 330).normalize();
+  asm.cam = { t: 0, fromT: view.controls.target.clone(), fromP: view.camera.position.clone(), toT: c, toP: c.clone().add(dir.multiplyScalar(dist)) };
+}
+function asmFrame(now, dtOverride) {
+  const dt = dtOverride ?? Math.min(0.05, (now - (asm.last || now)) / 1000); asm.last = now;
+  if (!asm.model) {                            // the 3D view finished loading while this tab was open
+    asmBuild(); asm.model.group.visible = true; poseModel(asm.model, { base: 0, shoulder: 0, elbow: 0, gripper: 50 }); asmFrameCamera(true);
+  }
+  const st = ASM_STEPS[asm.step], cur = st.parts || [], shown = new Set(asmShown(st));
+  asm.t += dt;
+  for (const c of view.root.children) c.visible = c === asm.model.group;
+  // pose: assembly position, or a slow test movement in the last step
+  let q = { base: 0, shoulder: 0, elbow: 0, gripper: 50 };
+  if (st.test) {
+    asm.testT += dt; const w = asm.testT * 0.9, k = Math.min(1, asm.testT / 1.5);
+    q = { base: 35 * Math.sin(w) * k, shoulder: 20 * Math.sin(w * 0.7) * k, elbow: 25 * Math.sin(w * 1.1) * k, gripper: 50 + 40 * Math.sin(w * 1.6) * k };
+  }
+  poseModel(asm.model, q);
+  const rootQ = view.root.getWorldQuaternion(new THREE.Quaternion()), pq = new THREE.Quaternion(), v = new THREE.Vector3();
+  const pulse = 0.2 + 0.15 * Math.sin(now / 260), focus = st.focus || [];
+  for (const h of asm.hi.values()) h.emissiveIntensity = pulse;
+  for (const n of ALL_PARTS) {
+    const { w, meshes } = asm.wraps[n], P = ASM_PARTS[n], k = cur.indexOf(n);
+    const state = k >= 0 || focus.includes(n) ? 'new' : shown.has(n) ? 'done' : 'todo';
+    w.visible = state !== 'todo' || cfg.asm.ghost;
+    for (const m of meshes) {
+      m.material = state === 'new' ? asmHiMat(m.userData.mat) : state === 'todo' ? asm.ghost : m.userData.mat;
+      m.castShadow = state !== 'todo';
+    }
+    w.position.set(0, 0, 0);
+    if (k >= 0) {                                // slide in, one part after the other
+      const off = P.dist * (1 - easeOut((asm.t - 0.25 - k * 0.55) / 0.9));
+      if (off > 0.01) {
+        v.set(...P.dir);
+        if (P.frame !== 'parent') { w.parent.getWorldQuaternion(pq); v.applyQuaternion(pq.invert().multiply(rootQ)); }
+        w.position.copy(v.multiplyScalar(off));
+      }
+    }
+  }
+  if (asm.cam) {
+    const c = asm.cam; c.t = Math.min(1, c.t + dt / 0.7); const e = easeOut(c.t);
+    view.controls.target.lerpVectors(c.fromT, c.toT, e); view.camera.position.lerpVectors(c.fromP, c.toP, e);
+    if (c.t >= 1) asm.cam = null;
+  }
+}
+function setupAsmEvents() {
+  $('#asmPrev').addEventListener('click', () => asmGo(asm.step - 1));
+  $('#asmNext').addEventListener('click', () => asmGo(asm.step === ASM_STEPS.length - 1 ? 0 : asm.step + 1));
+  $('#asmReplay').addEventListener('click', () => { asm.t = 0; });
+  $('#asmGhost').addEventListener('change', e => { cfg.asm.ghost = e.target.checked; saveCfg(); });
+  $('#asmList').addEventListener('click', e => { const it = e.target.closest('[data-step]'); if (it) asmGo(+it.dataset.step); });
+  $('#asmText').addEventListener('click', e => {
+    if (e.target.dataset.asm !== 'center') return;
+    if (!live() || !link.connected) { toast('Switch to Live and connect the Pico first'); return; }
+    setPose({ base: 0, shoulder: 0, elbow: 0, gripper: 50 });
+    toast('Servos moving to the assembly position');
+  });
 }
 
 /* ---------- 2D fallback (side + top view) ---------- */
@@ -2830,12 +3075,14 @@ function renderFwTag() {
    Wiring up events
    ===================================================================== */
 function setupEvents() {
+  setupAsmEvents();
   // tabs
   $$('#tabs button').forEach(b => b.addEventListener('click', () => {
     $$('#tabs button').forEach(x => x.classList.toggle('on', x === b));
     $$('.panel').forEach(p => p.classList.toggle('on', p.id === 'tab-' + b.dataset.tab));
     if (b.dataset.tab !== 'calib' && Object.keys(state.overrides).length) { state.overrides = {}; link.lastSent = ''; }
     if (b.dataset.tab === 'calib') refreshCalInfo();
+    b.dataset.tab === 'asm' ? asmEnter() : asmExit();
   }));
   // header
   $$('#modeSeg button').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
