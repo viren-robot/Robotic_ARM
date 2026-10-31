@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>ArmCtl — Arduino Robotic Arm</title>
+<title>ArmCtl — Pico W Robotic Arm</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23f26b1d'/%3E%3Cpath d='M16 50h20M26 50V34l12-14 10 6' stroke='white' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <script>
   // Apply saved theme before first paint (avoids a flash of the wrong theme)
@@ -232,7 +232,7 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
 <header>
   <div class="brand">
     <div class="logo"><svg width="20" height="20" viewBox="0 0 64 64"><path d="M10 54h26M22 54V34l14-16 14 8" stroke="#fff" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-    <div><h1>ArmCtl</h1><span>4-axis arm · 4× MG90S · Arduino Uno</span></div>
+    <div><h1>ArmCtl</h1><span>4-axis arm · 4× MG90S · Raspberry Pi Pico W</span></div>
   </div>
   <div class="seg" id="modeSeg" title="Simulator mode never sends anything to the arm">
     <button data-mode="sim">Simulator</button>
@@ -400,7 +400,7 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
     <div class="panel" id="tab-sim">
       <div class="card">
         <div class="head"><h3>Simulator mode</h3><span class="tag" id="simTag"></span></div>
-        <p class="muted">In simulator mode nothing is sent to the Arduino — the 3D arm moves with realistic MG90S speeds so you can practise and test animations safely. Every control (joints, IK, poses, animations, keyboard) works the same as in live mode.</p>
+        <p class="muted">In simulator mode nothing is sent to the Pico — the 3D arm moves with realistic MG90S speeds so you can practise and test animations safely. Every control (joints, IK, poses, animations, keyboard) works the same as in live mode.</p>
         <div class="row" style="margin-top:8px">
           <button class="btn blue" id="simEnter">Switch to simulator</button>
           <label class="chk"><input type="checkbox" data-bind="sim.realistic"> Realistic servo speed</label>
@@ -460,10 +460,10 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
         </div>
       </div>
       <div class="card">
-        <div class="head"><h3>On the Arduino</h3><span class="tag" id="fwSafeTag"></span></div>
-        <p class="small muted">These run inside <code>armctl.ino</code> on the Uno, so they protect the arm even if the page, the browser or the USB cable misbehaves. They're sent to the Uno when you connect. After updating this page, upload the firmware again (Settings → Upload to Arduino).</p>
+        <div class="head"><h3>On the Pico</h3><span class="tag" id="fwSafeTag"></span></div>
+        <p class="small muted">These run inside <code>main.py</code>, so they protect the arm even if the page, the browser or the USB cable misbehaves. They're sent to the Pico when you connect. After updating this page, upload <code>main.py</code> again (Settings → Upload to Pico).</p>
         <div class="grid3">
-          <label class="field"><span>Arduino speed limit (°/s)</span><input type="number" min="30" max="1000" step="10" data-bind="safety.fwSlew"></label>
+          <label class="field"><span>Pico speed limit (°/s)</span><input type="number" min="30" max="1000" step="10" data-bind="safety.fwSlew"></label>
           <label class="field"><span>Hold if no commands for (s)</span><input type="number" min="0.5" max="30" step="0.5" data-bind="safety.timeout"></label>
           <label class="field"><span>E-STOP</span><select data-bind="safety.estopMode"><option value="hold">Freeze in place (recommended)</option><option value="release">Release servos (arm goes limp)</option></select></label>
         </div>
@@ -520,24 +520,25 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
         <div class="tablewrap"><table id="pinTable"></table></div>
         <div id="pinMsgs" style="margin-top:10px;display:flex;flex-direction:column;gap:6px"></div>
         <div class="row" style="margin-top:12px">
-          <label class="chk small"><input type="checkbox" id="pinSave" checked> Also save on the Arduino (EEPROM)</label>
+          <label class="chk small"><input type="checkbox" id="pinSave" checked> Save on the Pico (survives reboot)</label>
           <span class="grow"></span>
           <button class="btn sm ghost" id="pinDefaults">Defaults</button>
-          <button class="btn sm primary" id="pinApply">Send to Arduino</button>
+          <button class="btn sm primary" id="pinApply">Send to Pico</button>
         </div>
       </div>
       <div class="card">
-        <div class="head"><h3>Arduino Uno pinout</h3><span class="small muted">top view, USB on the left</span></div>
-        <svg class="pinout" id="pinout" viewBox="0 30 540 330"></svg>
+        <div class="head"><h3>Pico W pinout</h3><span class="small muted">top view, USB at the top</span></div>
+        <svg class="pinout" id="pinout" viewBox="0 0 520 330"></svg>
       </div>
       <div class="card small">
         <div class="head"><h3>Wiring notes</h3></div>
         <ul style="margin:0;padding-left:18px">
-          <li>Power the four MG90S from a separate 5 V supply (≥ 3 A; each can draw ~0.7 A when stalled). <b>Not</b> from the Uno's 5V pin or USB — the Uno would brown out and restart.</li>
-          <li>Connect the servo supply's ground to an Uno <b>GND</b> pin — the signal needs a common ground.</li>
-          <li>Servo wires: <b>orange/yellow</b> = signal (to the pin above), <b>red</b> = +5 V (servo supply), <b>brown/black</b> = ground.</li>
-          <li>Any of D2–D13 and A0–A5 can drive a servo. D0 and D1 are the USB serial port and can't be used. D13 blinks while the Uno starts, which can make a servo twitch.</li>
-          <li>NeoPixels (optional) need the “Adafruit NeoPixel” library in the Arduino IDE. Put a 330 Ω resistor in series with the data line. The Uno has little memory, so use at most 60 LEDs.</li>
+          <li>Power the four MG90S from a separate 5 V supply (≥ 3 A; each can draw ~0.7 A when stalled). Never from the Pico's 3V3 pin, and not from USB.</li>
+          <li>Connect the servo supply ground to a Pico <b>GND</b> pin — the signal needs a common ground.</li>
+          <li>GP23, GP24, GP25 and GP29 are used by the Pico W's wireless chip and can't be assigned.</li>
+          <li>GPn and GPn+16 share one PWM output (e.g. GP0 &amp; GP16), so two servos can't use both.</li>
+          <li>Servo wires: <b>orange/yellow</b> = signal (to the GPIO above), <b>red</b> = +5 V (servo supply), <b>brown/black</b> = ground.</li>
+          <li>NeoPixels (optional) run on PIO, so any free GPIO works. Put a 330 Ω resistor in series with the data line.</li>
         </ul>
       </div>
     </div>
@@ -553,7 +554,7 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
         <div class="grid3">
           <label class="field"><span>LED type</span><select data-bind="led.type" id="ledType"></select></label>
           <label class="field"><span>Data pin</span><select data-bind="led.pin" data-num id="ledPin"></select></label>
-          <label class="field"><span>Number of LEDs</span><input type="number" min="1" max="60" data-bind="led.count"></label>
+          <label class="field"><span>Number of LEDs</span><input type="number" min="1" max="300" data-bind="led.count"></label>
           <label class="field"><span>Color order</span><select data-bind="led.order" id="ledOrder"></select></label>
           <label class="field"><span>Channels</span><select data-bind="led.bpp" data-num id="ledBpp"><option value="3">RGB (3)</option><option value="4">RGBW (4)</option></select></label>
           <label class="field"><span>Data rate</span><select data-bind="led.khz" data-num><option value="800">800 kHz</option><option value="400">400 kHz</option></select></label>
@@ -579,7 +580,7 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
         <h4>Quick colors</h4>
         <div class="swatches" id="swatches"></div>
         <p class="small muted" style="margin-top:10px">Status effect: amber pulse = waiting for a connection · primary color = connected · green = moving · red = E-stop.</p>
-        <div class="row end" style="margin-top:8px"><button class="btn sm primary" id="ledApply">Send to Arduino</button></div>
+        <div class="row end" style="margin-top:8px"><button class="btn sm primary" id="ledApply">Send to Pico</button></div>
       </div>
     </div>
 
@@ -602,7 +603,7 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
         <div class="head"><h3>USB connection</h3><span class="tag" id="serialSupport"></span></div>
         <div class="row">
           <label class="field" style="width:150px"><span>Update rate (Hz)</span><input type="number" min="5" max="60" data-bind="conn.rate"></label>
-          <label class="chk"><input type="checkbox" data-bind="conn.autoReconnect"> Reconnect when the Arduino is plugged back in</label>
+          <label class="chk"><input type="checkbox" data-bind="conn.autoReconnect"> Reconnect when the Pico is plugged back in</label>
         </div>
         <p class="small muted" id="connHint"></p>
         <h4>Ports</h4>
@@ -611,27 +612,22 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
           <span class="small muted grow">The browser's port picker shows the COM / tty name (e.g. COM3). Web pages can't read that name, so ports here are listed by their USB vendor:product ID.</span></div>
       </div>
       <div class="card">
-        <div class="head"><h3>Arduino firmware</h3><span class="tag" id="fwTag"></span></div>
-        <p class="small muted">The Uno needs the ArmCtl firmware once (and again after this page is updated). This page uploads it by itself over USB — no Arduino IDE needed. Your current pins, limits and LED settings are built into it.</p>
+        <div class="head"><h3>Pico firmware (MicroPython)</h3><span class="tag" id="fwTag"></span></div>
+        <p class="small muted">The Pico runs MicroPython plus the ArmCtl <code>main.py</code>. This page copies <code>main.py</code> onto the Pico by itself over USB — no Thonny needed. Your current pins, limits and LED settings are built into it. Works on a Raspberry Pi Pico or Pico W.</p>
         <ol class="small" style="margin:6px 0;padding-left:18px">
-          <li>Plug in the Uno and close the Arduino IDE's Serial Monitor (only one program can use the port).</li>
-          <li>Click <b>Upload to Arduino</b> and pick the Uno's port if asked. It takes a few seconds; the servos go limp meanwhile, so support the arm.</li>
-          <li>The page connects to the Uno when the upload is done.</li>
+          <li><b>Once:</b> install MicroPython. Hold the Pico's <b>BOOTSEL</b> button while plugging it in; it shows up as a drive called RPI-RP2. Copy the MicroPython <code>.uf2</code> file onto it (from <a href="https://micropython.org/download/RPI_PICO/" target="_blank" rel="noopener">micropython.org</a>; for a Pico W use the RPI_PICO_W file). The Pico restarts by itself.</li>
+          <li>Close Thonny if it's open (only one program can use the USB port).</li>
+          <li>Click <b>Upload to Pico</b> and pick the Pico's port if asked. It takes a few seconds, then the page connects.</li>
         </ol>
         <div class="row">
-          <button class="btn sm primary" id="fwFlash">Upload to Arduino</button>
+          <button class="btn sm primary" id="fwFlash">Upload to Pico</button>
           <div class="fwbar grow" id="fwBar" hidden><div></div></div>
         </div>
         <p class="small" id="fwStatus" aria-live="polite"></p>
         <details class="small">
-          <summary>Use the Arduino IDE instead</summary>
-          <ol style="margin:6px 0;padding-left:18px">
-            <li>Install the <b>Arduino IDE</b> (arduino.cc). If you use NeoPixels, also install the <b>Adafruit NeoPixel</b> library (Sketch → Include Library → Manage Libraries).</li>
-            <li>Download <code>armctl.ino</code> and open it in the Arduino IDE (let it create the “armctl” folder).</li>
-            <li>Tools → Board → <b>Arduino Uno</b>, Tools → Port → your Uno, then click <b>Upload</b>.</li>
-            <li>Close the IDE's Serial Monitor, then click <b>Connect USB</b> here.</li>
-          </ol>
-          <div class="row end"><button class="btn sm" id="fwDownload">Download armctl.ino</button></div>
+          <summary>Copy main.py yourself instead (Thonny)</summary>
+          <p style="margin:6px 0">Download <code>main.py</code>, open it in Thonny and save it onto the Pico as <code>main.py</code>. Delete <code>arm_cfg.json</code> on the Pico if it's there, so the new settings apply. Then close Thonny and click <b>Connect USB</b>.</p>
+          <div class="row end"><button class="btn sm" id="fwDownload">Download main.py</button></div>
         </details>
         <p class="small muted">The 3D view loads three.js from the internet; without internet the page falls back to a 2D schematic view.</p>
       </div>
@@ -652,9 +648,9 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
         </div>
         <div class="console" id="console"></div>
         <div class="row" style="margin-top:8px">
-          <input type="text" id="rawCmd" class="grow mono" placeholder="? (hello) · p 1 (ping) · P 1500 1500 1500 1500">
+          <input type="text" id="rawCmd" class="grow mono" placeholder='{"t":"ping"}'>
           <button class="btn sm" id="rawSend">Send</button>
-          <button class="btn sm ghost" id="boardReset" title="Restarts the Uno, like its reset button">Restart Arduino</button>
+          <button class="btn sm ghost" id="picoReset" title="Ctrl-C + Ctrl-D: restarts main.py on the Pico">Restart Pico</button>
         </div>
       </div>
     </div>
@@ -662,329 +658,313 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
 </main>
 <div class="toast" id="toast"></div>
 
-<!-- Arduino Uno firmware template (filled in by "Download armctl.ino") -->
+<!-- MicroPython firmware template (filled in by "Download main.py") -->
 <script type="text/plain" id="fwTemplate">
-// ArmCtl firmware for Arduino Uno — 4x MG90S robotic arm.
-// Generated by the ArmCtl web page with your pins and settings.
-//
-// How to install:
-//   1. Open this file in the Arduino IDE. It will offer to put it in a folder called "armctl": click OK.
-//   2. Tools > Board > "Arduino Uno", and Tools > Port > your Uno's port.
-//   3. Click Upload. Then close the Serial Monitor and click "Connect USB" in the ArmCtl page.
-//
-// The page sends one short text command per line at 115200 baud and the Uno answers with JSON lines.
-// Safety on the board itself: every pulse is clamped to the servo's calibrated range, each servo is
-// speed-limited, and the arm holds its position if the commands stop (cable pulled, page closed).
+# ArmCtl firmware for Raspberry Pi Pico / Pico W (MicroPython 1.20 or newer)
+# Generated by the ArmCtl page. Save this file on the Pico as main.py.
+# The page talks to it over USB (Web Serial): one JSON message per line.
+# To get back to the MicroPython prompt (e.g. in Thonny), press Ctrl-C.
+import time, json, sys, math, machine, neopixel, select
+try:
+    import asyncio
+except ImportError:
+    import uasyncio as asyncio
 
-#include <Servo.h>
-#include <EEPROM.h>
+FW = "armctl-usb-1.1"
+CFG_FILE = "arm_cfg.json"
 
-#define USE_NEOPIXEL {{USE_NEOPIXEL}}   // 1 needs the "Adafruit NeoPixel" library (Sketch > Include Library > Manage Libraries)
-#if USE_NEOPIXEL
-#include <Adafruit_NeoPixel.h>
-#endif
+# Pins & LED setup from the web page. A config saved from the page (arm_cfg.json) overrides it.
+cfg = json.loads('''{{CFG}}''')
+try:
+    with open(CFG_FILE) as f:
+        cfg = json.load(f)
+except Exception:
+    pass
 
-#define FW "armctl-uno-1.0"
-#define NSERVO 4                 // base, shoulder, elbow, gripper
-#define MAX_LEDS 60              // the Uno has only 2 KB of RAM
+st = {"estop": False, "moved": 0, "seen": 0, "lost": False}
+led = {"mode": "status", "c1": [0, 120, 255, 0], "c2": [255, 0, 120, 0], "bri": 80, "speed": 50}
+led.update(cfg.get("fx", {}))
+pwms = []
+pins_used = []
+np = None
 
-struct ServoCfg { uint8_t pin; uint16_t minUs, maxUs, slew; };   // slew = max pulse change in µs per second
-struct Config {
-  uint16_t magic;
-  uint16_t timeout;              // ms without commands before the arm holds still
-  ServoCfg s[NSERVO];
-  uint8_t ledPin, ledCount, ledBpp, ledKhz800;
-  char ledOrder[5];              // colour order, e.g. "GRB" or "GRBW"
-  uint8_t fx[11];                // effect, colour 1 (r g b w), colour 2 (r g b w), brightness, speed
-};
-// Settings from the page. Settings saved from the page into EEPROM replace these.
-// The first number is a tag that changes with the settings, so a new upload ignores old EEPROM settings.
-Config cfg = {{CFG}};
 
-Servo servo[NSERVO];
-uint8_t attachedPin[NSERVO];     // 0 = no pulses (pins 0 and 1 are the USB serial port, never servos)
-float cur[NSERVO];               // pulse being output now (µs)
-uint16_t tgt[NSERVO];            // pulse we're moving towards (µs)
-bool estop = false, lost = false;
-unsigned long seen = 0, moved = 0, lastStep = 0, lastRx = 0;
-char line[100];
-uint8_t len = 0;
-bool overflow = false;
+def save_cfg():
+    try:
+        with open(CFG_FILE, "w") as f:
+            json.dump(cfg, f)
+        return True
+    except Exception as e:
+        print("save failed", e)
+        return False
 
-// ---------------- servos ----------------
-uint16_t limitUs(uint8_t i, long v) {
-  if (v < cfg.s[i].minUs) return cfg.s[i].minUs;
-  if (v > cfg.s[i].maxUs) return cfg.s[i].maxUs;
-  return v;
-}
 
-void detachServo(uint8_t i) {
-  if (attachedPin[i]) { servo[i].detach(); attachedPin[i] = 0; }
-}
+# ---------------- servos (with safety limits) ----------------
+# Every pulse is clamped to the servo's min/max (from the page's calibration) and changes at most
+# "slew" microseconds per second, so no command can slam a joint past its range or jerk it.
+cur_us = []    # pulse being output now (None = no pulses yet / released)
+tgt_us = []    # pulse we're moving towards
 
-void applyServoConfig() {        // new limits apply right away; a servo moved to another pin waits for a new position
-  for (uint8_t i = 0; i < NSERVO; i++) {
-    if (attachedPin[i] && attachedPin[i] != cfg.s[i].pin) detachServo(i);
-    if (attachedPin[i]) {
-      tgt[i] = limitUs(i, tgt[i]);
-      cur[i] = limitUs(i, (long)(cur[i] + 0.5));
-      servo[i].writeMicroseconds((int)cur[i]);
-    }
-  }
-}
 
-void setTargets(const long *us) {
-  for (uint8_t i = 0; i < NSERVO; i++) {
-    if (us[i] <= 0) continue;
-    tgt[i] = limitUs(i, us[i]);
-    if (!attachedPin[i]) {       // first position after power-up or release: the servo's position is unknown
-      cur[i] = tgt[i];
-      servo[i].attach(cfg.s[i].pin, 400, 2600);
-      servo[i].writeMicroseconds(tgt[i]);
-      attachedPin[i] = cfg.s[i].pin;
-    }
-  }
-}
+def limit(i, v):
+    s = cfg["servos"][i]
+    return max(s.get("min", 500), min(s.get("max", 2500), v))
 
-void hold() {                    // stop where we are
-  for (uint8_t i = 0; i < NSERVO; i++) { tgt[i] = (uint16_t)(cur[i] + 0.5); cur[i] = tgt[i]; }
-}
 
-void release() {                 // no more pulses: the servos go limp
-  for (uint8_t i = 0; i < NSERVO; i++) detachServo(i);
-}
+def out(i):
+    pwms[i].duty_ns(int(cur_us[i] * 1000))
 
-void stepServos() {
-  unsigned long now = millis();
-  if (now - lastStep < 10) return;
-  float dt = (now - lastStep) / 1000.0;
-  if (dt > 0.1) dt = 0.1;
-  lastStep = now;
-  // watchdog: the page went quiet (USB unplugged, page closed, computer asleep) -> stop where we are
-  if (seen && !lost && now - seen > cfg.timeout) {
-    lost = true;
-    hold();
-    Serial.println(F("{\"t\":\"log\",\"msg\":\"no commands - holding position\"}"));
-  }
-  for (uint8_t i = 0; i < NSERVO; i++) {
-    if (!attachedPin[i]) continue;
-    float c = cur[i], t = tgt[i];
-    if (c == t) continue;
-    float step = cfg.s[i].slew * dt;
-    cur[i] = fabs(t - c) <= step ? t : c + (t > c ? step : -step);
-    servo[i].writeMicroseconds((int)(cur[i] + 0.5));
-  }
-}
 
-// ---------------- NeoPixels (optional) ----------------
-#if USE_NEOPIXEL
-Adafruit_NeoPixel strip;
-bool ledsShown = true;
+def setup_servos():
+    global pwms, pins_used, cur_us, tgt_us
+    pins = [s["pin"] for s in cfg["servos"]]
+    if pins != pins_used:
+        for p in pwms:
+            try:
+                p.deinit()
+            except Exception:
+                pass
+        for n in pins_used:
+            machine.Pin(n, machine.Pin.IN)
+        pwms = []
+        for n in pins:
+            p = machine.PWM(machine.Pin(n))
+            p.freq(50)
+            p.duty_u16(0)          # no pulses until the page sends a position
+            pwms.append(p)
+        pins_used = pins
+        cur_us = [None] * len(pins)
+        tgt_us = [None] * len(pins)
+    for i in range(len(pwms)):     # new limits apply right away
+        if cur_us[i] is not None:
+            cur_us[i] = limit(i, cur_us[i])
+            tgt_us[i] = limit(i, tgt_us[i])
+            out(i)
 
-uint16_t neoType() {             // Adafruit NEO_xxx value for a colour order like "GRB" or "GRBW"
-  const char *o = cfg.ledOrder;
-  const char *r = strchr(o, 'R'), *g = strchr(o, 'G'), *b = strchr(o, 'B'), *w = strchr(o, 'W');
-  if (!r || !g || !b) return NEO_GRB + NEO_KHZ800;
-  uint8_t ri = r - o, gi = g - o, bi = b - o, wi = (cfg.ledBpp == 4 && w) ? w - o : ri;
-  return ((wi << 6) | (ri << 4) | (gi << 2) | bi) + (cfg.ledKhz800 ? NEO_KHZ800 : NEO_KHZ400);
-}
 
-void setupLeds() {
-  strip.clear(); strip.show();
-  if (cfg.ledCount > MAX_LEDS) cfg.ledCount = MAX_LEDS;
-  if (!cfg.ledCount || cfg.ledPin < 2) { strip.updateLength(0); return; }
-  strip.updateType(neoType());
-  strip.updateLength(cfg.ledCount);
-  strip.setPin(cfg.ledPin);
-  strip.begin();
-  strip.clear();
-  ledsShown = false;
-}
+def set_targets(us):
+    for i in range(min(len(us), len(pwms))):
+        if not us[i]:
+            continue
+        tgt_us[i] = limit(i, us[i])
+        if cur_us[i] is None:      # first command after power-up or release: the servo's position is unknown
+            cur_us[i] = tgt_us[i]
+            out(i)
 
-void wheel(uint8_t p, float *c) {
-  if (p < 85) { c[0] = 255 - p * 3; c[1] = p * 3; c[2] = 0; }
-  else if (p < 170) { p -= 85; c[0] = 0; c[1] = 255 - p * 3; c[2] = p * 3; }
-  else { p -= 170; c[0] = p * 3; c[1] = 0; c[2] = 255 - p * 3; }
-  c[3] = 0;
-}
 
-void renderLeds() {
-  static unsigned long last = 0;
-  static uint32_t t = 0, lastSum = 0;
-  unsigned long now = millis();
-  if (!strip.numPixels() || now - last < 40) return;
-  last = now; t++;
-  const uint8_t *f = cfg.fx;
-  const uint8_t *c1 = f + 1, *c2 = f + 5;
-  float bri = f[9] / 255.0, sp = max(1, f[10]) / 50.0;
-  uint16_t n = strip.numPixels();
-  uint32_t sum = 0;
-  for (uint16_t i = 0; i < n; i++) {
-    float c[4] = {0, 0, 0, 0}, k = 1;
-    switch (f[0]) {
-      case 1: {                  // status: red = E-STOP, amber blink = no commands, green = moving, colour 1 = connected
-        uint8_t red[4] = {255, 0, 0, 0}, amber[4] = {255, 140, 0, 0}, green[4] = {0, 255, 60, 0};
-        const uint8_t *s;
-        if (estop) s = red;
-        else if (lost) { s = amber; k = 0.1 + 0.9 * (sin(t * 0.3) + 1) / 2; }
-        else if (now - moved < 600 && moved) s = green;
-        else if (seen && now - seen < 4000) { s = c1; k = 0.45 + 0.55 * (sin(t * 0.06) + 1) / 2; }
-        else { s = amber; k = 0.1 + 0.9 * (sin(t * 0.14) + 1) / 2; }
-        for (uint8_t j = 0; j < 4; j++) c[j] = s[j];
-        break;
-      }
-      case 2: for (uint8_t j = 0; j < 4; j++) c[j] = c1[j]; break;                                   // solid
-      case 3: for (uint8_t j = 0; j < 4; j++) c[j] = c1[j]; k = 0.05 + 0.95 * (sin(t * 0.07 * sp) + 1) / 2; break;   // breathe
-      case 4: wheel((uint8_t)(i * 256 / n + t * 2.4 * sp), c); break;                               // rainbow
-      case 5: {                  // chase
-        float tail = max(1, n / 3);
-        uint16_t head = (uint16_t)(t * 0.3 * sp) % n, d = (head + n - i) % n;
-        if (d < tail) { for (uint8_t j = 0; j < 4; j++) c[j] = c1[j]; k = 1 - d / tail; }
-        else { for (uint8_t j = 0; j < 4; j++) c[j] = c2[j]; k = 0.15; }
-        break;
-      }
-      case 6: {                  // gradient
-        float u = fmod((float)i / n + t * 0.005 * sp, 1.0);
-        u = 1 - fabs(2 * u - 1);
-        for (uint8_t j = 0; j < 4; j++) c[j] = c1[j] + (c2[j] - c1[j]) * u;
-        break;
-      }
-      default: k = 0;            // off
-    }
-    uint8_t v[4];
-    for (uint8_t j = 0; j < 4; j++) { float x = c[j] * bri * k; v[j] = x < 0 ? 0 : x > 255 ? 255 : (uint8_t)x; sum = sum * 31 + v[j]; }
-    strip.setPixelColor(i, v[0], v[1], v[2], v[3]);
-  }
-  if (sum != lastSum) { lastSum = sum; ledsShown = false; }
-}
+def hold():
+    for i in range(len(pwms)):
+        tgt_us[i] = cur_us[i]
 
-// Sending to the LEDs blocks interrupts for a moment, which could drop USB bytes:
-// only do it when no command is arriving.
-void showLeds(bool lineJustDone) {
-  if (!ledsShown && (lineJustDone || millis() - lastRx > 15) && !Serial.available()) { strip.show(); ledsShown = true; }
-}
-#endif
 
-// ---------------- settings in EEPROM ----------------
-void saveConfig() { EEPROM.put(0, cfg); }
+def release():
+    for i in range(len(pwms)):
+        pwms[i].duty_u16(0)
+        cur_us[i] = None
+        tgt_us[i] = None
 
-// ---------------- commands from the page ----------------
-long num(char *&p) { return strtol(p, &p, 10); }
-long numIn(char *&p, long lo, long hi) {   // next number, kept in range (constrain() is a macro: it would read it twice)
-  long v = num(p);
-  return v < lo ? lo : v > hi ? hi : v;
-}
-char *nextWord(char *&p) {
-  while (*p == ' ') p++;
-  char *w = p;
-  while (*p && *p != ' ') p++;
-  if (*p) *p++ = 0;
-  return w;
-}
 
-void hello() {
-  Serial.print(F("{\"t\":\"hello\",\"fw\":\"" FW "\",\"servos\":"));
-  Serial.print(NSERVO);
-  Serial.print(F(",\"neopixel\":"));
-  Serial.print(USE_NEOPIXEL);
-  Serial.println('}');
-}
+async def servo_task():
+    last = time.ticks_ms()
+    while True:
+        await asyncio.sleep_ms(10)
+        now = time.ticks_ms()
+        dt = time.ticks_diff(now, last) / 1000
+        last = now
+        # watchdog: the page went quiet (USB unplugged, page closed, computer asleep) -> stop where we are
+        if st["seen"] and not st["lost"] and time.ticks_diff(now, st["seen"]) > cfg.get("timeout", 2000):
+            st["lost"] = True
+            hold()
+            print(json.dumps({"t": "log", "msg": "no commands - holding position"}))
+        for i in range(len(pwms)):
+            c, t = cur_us[i], tgt_us[i]
+            if c is None or t is None or c == t:
+                continue
+            step = cfg["servos"][i].get("slew", 2000) * dt
+            cur_us[i] = t if abs(t - c) <= step else c + (step if t > c else -step)
+            out(i)
 
-void handle(char *p) {
-  seen = millis();
-  char c = *p++;
-  switch (c) {
-    case 'P': {                  // P us0 us1 us2 us3 : servo positions (pulse widths)
-      long us[NSERVO];
-      for (uint8_t i = 0; i < NSERVO; i++) us[i] = num(p);
-      lost = false;
-      if (!estop) { setTargets(us); moved = seen; }   // ignored during E-STOP
-      break;
-    }
-    case 'p':                    // p id : ping
-      Serial.print(F("{\"t\":\"pong\",\"id\":"));
-      Serial.print(strtoul(p, &p, 10));
-      Serial.println('}');
-      break;
-    case '?': hello(); break;
-    case 'S':                    // S 0|1 : E-STOP, 0 = freeze in place, 1 = release the servos
-      estop = true;
-      if (num(p) == 1) release(); else hold();
-      break;
-    case 'R': estop = false; break;        // reset the E-STOP
-    case 'H': hold(); break;               // hold still (page switched to the simulator)
-    case 'O': release(); estop = num(p) == 1; break;
-    case 'C': {                  // C save timeout n [pin min max slew]*n ledPin ledCount bpp khz800 order
-      bool save = num(p) == 1;
-      cfg.timeout = numIn(p, 200, 30000);
-      uint8_t n = num(p);
-      for (uint8_t i = 0; i < n; i++) {
-        ServoCfg s;
-        s.pin = num(p); s.minUs = num(p); s.maxUs = num(p); s.slew = num(p);
-        if (i < NSERVO && s.pin >= 2 && s.pin <= 19 && s.minUs >= 400 && s.maxUs <= 2600 && s.minUs < s.maxUs && s.slew > 0) cfg.s[i] = s;
-      }
-      cfg.ledPin = num(p); cfg.ledCount = numIn(p, 0, MAX_LEDS); cfg.ledBpp = num(p) == 4 ? 4 : 3; cfg.ledKhz800 = num(p) != 0;
-      strncpy(cfg.ledOrder, nextWord(p), 4); cfg.ledOrder[4] = 0;
-      applyServoConfig();
-#if USE_NEOPIXEL
-      setupLeds();
-#endif
-      if (save) saveConfig();
-      Serial.print(F("{\"t\":\"ack\",\"what\":\"cfg\",\"saved\":"));
-      Serial.print(save ? F("true") : F("false"));
-      Serial.println('}');
-      break;
-    }
-    case 'L': {                  // L save effect r g b w r g b w brightness speed
-      bool save = num(p) == 1;
-      for (uint8_t k = 0; k < 11; k++) cfg.fx[k] = numIn(p, 0, 255);
-      if (save) saveConfig();
-      break;
-    }
-    default:
-      Serial.println(F("{\"t\":\"log\",\"msg\":\"unknown command\"}"));
-  }
-}
 
-void setup() {
-  Serial.begin(115200);
-  Config saved;
-  EEPROM.get(0, saved);
-  if (saved.magic == cfg.magic) cfg = saved;
-#if USE_NEOPIXEL
-  setupLeds();
-#endif
-  Serial.println(F("{\"t\":\"ready\",\"fw\":\"" FW "\"}"));
-}
+# ---------------- NeoPixels ----------------
+def setup_led():
+    global np
+    if np:
+        try:
+            np.fill((0,) * np.bpp)
+            np.write()
+        except Exception:
+            pass
+    np = None
+    L = cfg.get("led")
+    if not L or L.get("count", 0) <= 0:
+        return
+    bpp = L.get("bpp", 3)
+    np = neopixel.NeoPixel(machine.Pin(L["pin"]), L["count"], bpp=bpp, timing=L.get("timing", 1))
+    order = L.get("order", "GRBW"[:bpp])
+    np.ORDER = tuple(order.index(c) for c in "RGBW"[:bpp])
 
-void loop() {
-  bool lineDone = false;
-  while (Serial.available()) {
-    char ch = Serial.read();
-    lastRx = millis();
-    if (ch == '\n') {
-      line[len] = 0;
-      if (len && !overflow) { handle(line); lineDone = true; }
-      len = 0; overflow = false;
-    } else if (ch != '\r') {
-      if (len < sizeof(line) - 1) line[len++] = ch; else overflow = true;
-    }
-  }
-  stepServos();
-#if USE_NEOPIXEL
-  renderLeds();
-  showLeds(lineDone);
-#else
-  (void)lineDone;
-#endif
-}
+
+def wheel(p):
+    p = int(p) % 256
+    if p < 85:
+        return [255 - p * 3, p * 3, 0, 0]
+    if p < 170:
+        p -= 85
+        return [0, 255 - p * 3, p * 3, 0]
+    p -= 170
+    return [p * 3, 0, 255 - p * 3, 0]
+
+
+def render_led(t):
+    n = np.n
+    bpp = np.bpp
+    b = led["bri"] / 255
+    sp = max(1, led["speed"]) / 50
+    m = led["mode"]
+    c1 = (list(led["c1"]) + [0, 0, 0, 0])[:4]
+    c2 = (list(led["c2"]) + [0, 0, 0, 0])[:4]
+
+    def put(i, c, k=1.0):
+        np[i] = tuple(max(0, min(255, int(c[j] * b * k))) for j in range(bpp))
+
+    if m == "status":
+        now = time.ticks_ms()
+        if st["estop"]:
+            c, k = [255, 0, 0, 0], 1.0
+        elif st["lost"]:
+            c, k = [255, 140, 0, 0], 0.1 + 0.9 * (math.sin(t * 0.25) + 1) / 2
+        elif time.ticks_diff(now, st["moved"]) < 600:
+            c, k = [0, 255, 60, 0], 1.0
+        elif st["seen"] and time.ticks_diff(now, st["seen"]) < 4000:
+            c, k = c1, 0.45 + 0.55 * (math.sin(t * 0.05) + 1) / 2
+        else:
+            c, k = [255, 140, 0, 0], 0.1 + 0.9 * (math.sin(t * 0.12) + 1) / 2
+        for i in range(n):
+            put(i, c, k)
+    elif m == "solid":
+        for i in range(n):
+            put(i, c1)
+    elif m == "breathe":
+        k = 0.05 + 0.95 * (math.sin(t * 0.06 * sp) + 1) / 2
+        for i in range(n):
+            put(i, c1, k)
+    elif m == "rainbow":
+        for i in range(n):
+            put(i, wheel(i * 256 / n + t * 2 * sp))
+    elif m == "chase":
+        tail = max(1, n / 3)
+        head = int(t * 0.25 * sp) % n
+        for i in range(n):
+            d = (head - i) % n
+            if d < tail:
+                put(i, c1, 1 - d / tail)
+            else:
+                put(i, c2, 0.15)
+    elif m == "gradient":
+        for i in range(n):
+            k = (i / n + t * 0.004 * sp) % 1
+            k = 1 - abs(2 * k - 1)
+            put(i, [c1[j] + (c2[j] - c1[j]) * k for j in range(4)])
+    else:
+        np.fill((0,) * bpp)
+    np.write()
+
+
+async def led_task():
+    t = 0
+    while True:
+        if np:
+            try:
+                render_led(t)
+            except Exception as e:
+                print("led error", e)
+        t += 1
+        await asyncio.sleep_ms(33)
+
+
+# ---------------- protocol ----------------
+def handle(line):
+    try:
+        m = json.loads(line)
+    except Exception:
+        return None
+    st["seen"] = time.ticks_ms()
+    t = m.get("t")
+    if t == "pos":
+        st["lost"] = False
+        if not st["estop"]:        # ignored until the page resets the E-STOP
+            set_targets(m.get("us", []))
+            st["moved"] = st["seen"]
+    elif t == "stop":              # E-STOP: freeze in place, or go limp
+        st["estop"] = True
+        if m.get("mode") == "release":
+            release()
+        else:
+            hold()
+    elif t == "resume":
+        st["estop"] = False
+    elif t == "hold":
+        hold()
+    elif t == "off":
+        release()
+        st["estop"] = bool(m.get("estop", False))
+    elif t == "cfg":
+        if "servos" in m:
+            cfg["servos"] = m["servos"]
+        if "led" in m:
+            cfg["led"] = m["led"]
+        if "timeout" in m:
+            cfg["timeout"] = m["timeout"]
+        setup_servos()
+        setup_led()
+        saved = save_cfg() if m.get("save") else False
+        return {"t": "ack", "what": "cfg", "saved": saved}
+    elif t == "led":
+        led.update(m.get("fx", {}))
+        if m.get("save"):
+            cfg["fx"] = dict(led)
+            save_cfg()
+    elif t == "ping":
+        return {"t": "pong", "id": m.get("id")}
+    elif t == "hello":
+        return {"t": "hello", "fw": FW, "servos": len(pwms), "led": cfg.get("led")}
+    return None
+
+
+async def serial_task():
+    p = select.poll()
+    p.register(sys.stdin, select.POLLIN)
+    buf = []
+    while True:
+        while p.poll(0):
+            c = sys.stdin.read(1)
+            if c == "\n":
+                r = handle("".join(buf))
+                buf = []
+                if r:
+                    print(json.dumps(r))
+            elif c != "\r":
+                buf.append(c)
+                if len(buf) > 4096:
+                    buf = []
+        await asyncio.sleep_ms(4)
+
+
+async def main():
+    setup_servos()
+    setup_led()
+    asyncio.create_task(led_task())
+    asyncio.create_task(servo_task())
+    print(json.dumps({"t": "log", "msg": "ArmCtl ready on USB"}))
+    await serial_task()
+
+
+asyncio.run(main())
 </script>
-<!-- Ready-made armctl firmware for "Upload to Arduino", built from the template above by tools/build-firmware.js -->
-<script type="application/json" id="fwImages">{"fw":"armctl-uno-1.0","src":"b7486b13","built":"2026-10-30","neopixel":{"0":{"size":8820,"cfgAt":8747,"data":"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"},"1":{"size":14240,"cfgAt":14151,"data":"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"}}}</script>
 
 <script type="module">
 /* =====================================================================
-   ArmCtl — control page for a 4-axis robotic arm (4× MG90S) driven by an Arduino Uno over USB
+   ArmCtl — control page for a 4-axis robotic arm (4× MG90S) on a Raspberry Pi Pico W
    ===================================================================== */
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -1000,15 +980,14 @@ const JOINTS = [
   { id: 'elbow',    name: 'Elbow',    keys: ['e', 'd'], unit: '°', servo: 'MG90S' },
   { id: 'gripper',  name: 'Gripper',  keys: ['r', 'f'], unit: '%', servo: 'MG90S' },
 ];
-// Order here = order of pulse widths in the "P" command sent to the Arduino
+// Order here = order of pulse widths in the "pos" packet sent to the Pico
 const SERVOS = [
   { id: 'base',     name: 'Base',     joint: 'base',     type: 'MG90S' },
   { id: 'shoulder', name: 'Shoulder', joint: 'shoulder', type: 'MG90S' },
   { id: 'elbow',    name: 'Elbow',    joint: 'elbow',    type: 'MG90S' },
   { id: 'gripper',  name: 'Gripper',  joint: 'gripper',  type: 'MG90S' },
 ];
-const BOARD_PINS = [...Array(18).keys()].map(i => i + 2);    // Uno D2–D13 and A0–A5 (14–19); D0/D1 are the USB serial port
-const pinName = p => p >= 14 ? 'A' + (p - 14) : 'D' + p;
+const PICO_PINS = [...Array(23).keys(), 26, 27, 28];
 const LED_TYPES = {
   'WS2812B':     { order: 'GRB',  bpp: 3, khz: 800, info: '5 V, the most common NeoPixel.' },
   'WS2812':      { order: 'GRB',  bpp: 3, khz: 800, info: '5 V, older 6-pin version of the WS2812B.' },
@@ -1037,7 +1016,7 @@ const DEMO_ANIMS = (() => {
 })();
 const servoDefaults = (pin, type, extra = {}) => ({ pin, type, center: 90, invert: false, minAngle: 0, maxAngle: 180, minUs: 500, maxUs: 2500, range: 180, ...extra });
 const DEFAULT_CFG = {
-  version: 5,
+  version: 6,
   theme: 'auto',
   mode: 'sim',
   speed: 50,
@@ -1048,13 +1027,13 @@ const DEFAULT_CFG = {
     gripper:  { min: 0,   max: 100, home: 50 },
   },
   servos: {
-    base:     servoDefaults(3, 'MG90S'),     // Arduino Uno D3
-    shoulder: servoDefaults(5, 'MG90S'),     // D5
-    elbow:    servoDefaults(6, 'MG90S'),     // D6
-    gripper:  servoDefaults(9, 'MG90S', { closedAngle: 40, openAngle: 130 }),   // D9
+    base:     servoDefaults(0, 'MG90S'),
+    shoulder: servoDefaults(2, 'MG90S'),
+    elbow:    servoDefaults(4, 'MG90S'),
+    gripper:  servoDefaults(6, 'MG90S', { closedAngle: 40, openAngle: 130 }),
   },
   typeSpeed: { MG90S: 400 },
-  led: { enabled: false, type: 'WS2812B', pin: 7, count: 8, order: 'GRB', bpp: 3, khz: 800,
+  led: { enabled: true, type: 'WS2812B', pin: 15, count: 8, order: 'GRB', bpp: 3, khz: 800,
          mode: 'status', color1: '#0078ff', color2: '#ff0078', white: 0, brightness: 80, speed: 50 },
   conn: { rate: 30, autoReconnect: true, port: '' },   // port: 'VID:PID#n' of the chosen USB port
   view: { grid: true, envelope: true, axes: false, shadows: true, ikMarker: true, trail: false, animPath: true },
@@ -1088,9 +1067,9 @@ function loadCfg(saved) {
       for (const k of Object.keys(old)) if (sv[k]) sv[k].pin = DEFAULT_CFG.servos[k].pin;
     if (saved.led && +saved.led.pin === 16) saved.led.pin = DEFAULT_CFG.led.pin;
   }
-  if (v < 5) {                                   // v5: Arduino Uno instead of the Pico: Pico pin numbers don't apply
+  if (v === 5) {                                 // v5 was the Arduino Uno version: its D-pin numbers mean nothing on a Pico
     for (const k of Object.keys(DEFAULT_CFG.servos)) if (saved.servos?.[k]) saved.servos[k].pin = DEFAULT_CFG.servos[k].pin;
-    if (saved.led) { saved.led.pin = DEFAULT_CFG.led.pin; saved.led.count = Math.min(+saved.led.count || 8, 60); }
+    if (saved.led) saved.led.pin = DEFAULT_CFG.led.pin;
     if (saved.conn) saved.conn.port = '';
   }
   delete saved.version;
@@ -1302,39 +1281,12 @@ function pulses() {
 }
 
 /* =====================================================================
-   Connection: USB (Web Serial) to the Arduino Uno sketch armctl.ino.
-   The page sends one short text command per line (the Uno has no room for a JSON parser);
-   the Uno answers with JSON lines. Opening the port restarts the Uno, so wait for its "ready".
+   Connection: USB (Web Serial) to MicroPython main.py, one JSON message per line
    ===================================================================== */
-const BAUD = 115200;
-const UNO_VIDS = { 0x2341: 'Arduino Uno', 0x2a03: 'Arduino Uno', 0x1a86: 'Arduino Uno clone (CH340)', 0x0403: 'FTDI USB serial', 0x10c4: 'CP210x USB serial' };
-const LED_MODES = ['off', 'status', 'solid', 'breathe', 'rainbow', 'chase', 'gradient'];
-const isUnoFw = fw => /^armctl-uno-/.test(fw || '');
-// Message -> text command for the Uno (see handle() in armctl.ino)
-function encode(m) {
-  switch (m.t) {
-    case 'pos': return 'P ' + m.us.join(' ');
-    case 'ping': return 'p ' + m.id;
-    case 'hello': return '?';
-    case 'stop': return 'S ' + (m.mode === 'release' ? 1 : 0);
-    case 'resume': return 'R';
-    case 'hold': return 'H';
-    case 'off': return 'O ' + (m.estop ? 1 : 0);
-    case 'cfg': return ['C', m.save ? 1 : 0, m.timeout, m.servos.length, ...m.servos.flatMap(s => [s.pin, s.min, s.max, s.slew]),
-      m.led.pin, m.led.count, m.led.bpp, m.led.timing, m.led.order].join(' ');
-    case 'led': { const f = m.fx; return ['L', m.save ? 1 : 0, Math.max(0, LED_MODES.indexOf(f.mode)), ...f.c1, ...f.c2, f.bri, f.speed].join(' '); }
-  }
-  return null;
-}
-let flashing = false;          // the firmware is being uploaded (Settings)
-const fwImages = (() => { try { return JSON.parse($('#fwImages').textContent); } catch (e) { return {}; } })();
-if (fwImages.src) {             // tools/build-firmware.js stores a hash of the sketch it compiled
-  const t = $('#fwTemplate').textContent.replace(/^\n/, '');
-  let h = 0x811c9dc5; for (let i = 0; i < t.length; i++) h = Math.imul(h ^ t.charCodeAt(i), 0x01000193) >>> 0;
-  if (h.toString(16).padStart(8, '0') !== fwImages.src) console.warn('The built-in firmware is older than the sketch in #fwTemplate — run tools/build-firmware.js');
-}
+const PICO_VID = 0x2e8a;                       // Raspberry Pi (RP2040) USB vendor id
+let flashing = false;          // main.py is being copied to the Pico (Settings)
 const link = {
-  port: null, reader: null, writer: null, connected: false, connecting: false, booting: false, bootTimer: 0,
+  port: null, reader: null, writer: null, connected: false, connecting: false,
   wantOpen: false, lastPong: 0, rtt: null, lastSent: '', lastSendT: 0, fw: '', silentWarned: false,
 
   async open(port) {
@@ -1343,7 +1295,7 @@ const link = {
     this.connecting = true; updateConn();
     try {
       port ||= selectedPort() || await navigator.serial.requestPort();
-      await port.open({ baudRate: BAUD });
+      await port.open({ baudRate: 115200 });
       this.port = port; this.wantOpen = true;
       await refreshPorts(); choosePort(port);
       this.writer = port.writable.getWriter();
@@ -1351,7 +1303,7 @@ const link = {
       this.readSerial();
     } catch (e) {
       this.connecting = false; updateConn();
-      if (e.name !== 'NotFoundError') log('Connect failed: ' + e.message + (e.name === 'NetworkError' ? ' (is the Arduino IDE’s Serial Monitor or another program using the port?)' : ''), 'er');
+      if (e.name !== 'NotFoundError') log('Connect failed: ' + e.message + (e.name === 'NetworkError' ? ' (is Thonny or another program using the port?)' : ''), 'er');
     }
   },
   async readSerial() {
@@ -1370,40 +1322,16 @@ const link = {
     if (this.connected) this.close(false);     // unplugged: keep wantOpen so it reconnects when plugged back in
   },
   onOpen() {
-    this.connected = true; this.connecting = false; this.lastSent = ''; this.silentWarned = false; this.fw = '';
-    log('USB port open — waiting for the Arduino to start (it restarts when the port opens)…', 'rx');
-    this.waitBoot();
-    updateConn(); renderPorts();
-  },
-  waitBoot() {               // the Uno prints {"t":"ready"} after its bootloader; don't send before that
-    this.booting = true; clearTimeout(this.bootTimer);
-    this.bootTimer = setTimeout(() => this.handshake(), 3000);     // boards that don't auto-reset never say ready
-    updateConn();
-  },
-  handshake() {
-    if (!this.connected) return;
-    clearTimeout(this.bootTimer);
-    const first = this.booting;
-    this.booting = false; this.lastPong = performance.now(); this.lastSent = '';
-    this.raw('\n');
+    this.connected = true; this.connecting = false; this.lastPong = performance.now(); this.lastSent = ''; this.silentWarned = false;
+    log('Connected over USB', 'rx'); toast('Connected to the Pico');
+    this.raw('\r\n');
     this.send({ t: 'hello' });
     this.send(cfgPacket(false));
     this.send(ledPacket(false));
-    if (first) toast('Connected to the Arduino');
-    updateConn();
-  },
-  async restart() {          // like pressing the Uno's reset button: pulse DTR
-    if (!this.port) { toast('Not connected'); return; }
-    this.waitBoot(); log('Restarting the Arduino…');
-    try {
-      await this.port.setSignals({ dataTerminalReady: false, requestToSend: false });
-      await new Promise(r => setTimeout(r, 120));
-      await this.port.setSignals({ dataTerminalReady: true, requestToSend: true });
-    } catch (e) { log('Could not restart the board from here: ' + e.message, 'er'); }
+    updateConn(); renderPorts();
   },
   async close(byUser = true) {
     if (byUser) this.wantOpen = false;
-    clearTimeout(this.bootTimer); this.booting = false;
     const was = this.connected, p = this.port;
     this.connected = false; this.connecting = false; this.port = null; this.rtt = null;
     if (p) {
@@ -1413,14 +1341,13 @@ const link = {
     }
     this.writer = null; updateConn(); updateWarnings(); renderPorts();
     if (was) log(byUser ? 'Disconnected' : 'USB connection lost', byUser ? '' : 'er');
-    if (was && !byUser && live()) { stopAnim(); safetyEvent('USB connection lost — the Arduino holds the arm still', true); }
+    if (was && !byUser && live()) { stopAnim(); safetyEvent('USB connection lost — the Pico holds the arm still', true); }
     renderSafety();
   },
   raw(text) { if (this.writer) this.writer.write(new TextEncoder().encode(text)).catch(() => {}); },
   send(obj) {
-    if (!this.connected || this.booting) return false;
-    const text = encode(obj);
-    if (!text) return false;
+    if (!this.connected) return false;
+    const text = JSON.stringify(obj);
     this.raw(text + '\n');
     if (obj.t !== 'pos' && obj.t !== 'ping' || $('#logVerbose').checked) log('→ ' + text, 'tx');
     return true;
@@ -1428,22 +1355,13 @@ const link = {
   onLine(line) {
     let m; try { m = JSON.parse(line); } catch (e) {
       log('« ' + line);
-      if (/[\x00-\x08\ufffd]/.test(line)) log('Garbled data from the board: click “Upload to Arduino” in Settings (the firmware uses 115200 baud).', 'er');
+      if (/^(>>>|MicroPython|Type "help)/.test(line)) log('The Pico is at the MicroPython prompt, so main.py is not running. Click “Upload to Pico” in Settings, or “Restart Pico”.', 'er');
       return;
-    }
-    if (m.t === 'ready') {
-      if (this.booting) log('Arduino started (' + (m.fw || '?') + ')', 'rx');
-      else {                 // it restarted on its own: almost always a power problem
-        stopAnim(); state.target = { ...state.current };
-        safetyEvent('The Arduino restarted unexpectedly — usually the servos are drawing power from the Uno. Power them from a separate 5 V supply.', true);
-      }
-      this.handshake(); return;
     }
     if (m.t === 'pong') { this.lastPong = performance.now(); this.rtt = Math.round(performance.now() - (m.id || 0)); this.silentWarned = false; updateConn(); return; }
     if (m.t === 'hello') {
       this.fw = m.fw || ''; renderSafety(); renderFwTag();
-      if (!isUnoFw(this.fw)) safetyEvent('This board isn’t running the ArmCtl firmware — click “Upload to Arduino” in Settings.', true);
-      if (!m.neopixel && cfg.led.enabled) log('The firmware on the Uno was made with NeoPixels off — click “Upload to Arduino” in Settings again to use the LEDs.', 'er');
+      if (this.fw < FW_SAFE) safetyEvent('The Pico runs an old main.py without the Pico-side limits — click “Upload to Pico” in Settings.', true);
     }
     log('← ' + line, 'rx');
   },
@@ -1452,7 +1370,7 @@ if ('serial' in navigator) {
   navigator.serial.addEventListener('connect', async e => {
     await refreshPorts();
     if (link.wantOpen && cfg.conn.autoReconnect && !link.connected && portKey(e.target) === cfg.conn.port) {
-      log('Arduino plugged back in — reconnecting'); setTimeout(() => link.open(e.target), 800);
+      log('Pico plugged back in — reconnecting'); setTimeout(() => link.open(e.target), 800);
     }
   });
   navigator.serial.addEventListener('disconnect', e => { if (e.target === link.port && link.connected) link.close(false); refreshPorts(); });
@@ -1465,14 +1383,11 @@ const hex4 = v => v == null ? '----' : v.toString(16).toUpperCase().padStart(4, 
 const portKey = p => ports.keys[ports.list.indexOf(p)] || '';
 function portName(p) {
   const v = p.getInfo().usbVendorId, [id, n] = portKey(p).split('#');
-  const name = UNO_VIDS[v] || (v != null ? 'USB serial device' : 'Serial port');
+  const name = v === PICO_VID ? 'Raspberry Pi Pico' : v != null ? 'USB serial device' : 'Serial port';
   return `${name}${v != null ? ` (${id})` : ''}${+n > 1 ? ` #${n}` : ''}`;
 }
 // The saved port if it is plugged in, otherwise the only available port
-const selectedPort = () => {
-  const unos = ports.list.filter(p => p.getInfo().usbVendorId in UNO_VIDS);
-  return ports.list[ports.keys.indexOf(cfg.conn.port)] || (ports.list.length === 1 ? ports.list[0] : unos.length === 1 ? unos[0] : null);
-};
+const selectedPort = () => ports.list[ports.keys.indexOf(cfg.conn.port)] || (ports.list.length === 1 ? ports.list[0] : null);
 function choosePort(p) { const k = portKey(p); if (k && k !== cfg.conn.port) { cfg.conn.port = k; saveCfg(); } renderPorts(); }
 async function refreshPorts() {
   if (!('serial' in navigator)) { renderPorts(); return; }
@@ -1519,13 +1434,13 @@ function cfgPacket(save) {
   const L = cfg.led;
   return {
     t: 'cfg', save: !!save,
-    // Board-side safety: pulse range from the calibrated min/max angle, speed limit in µs per second
+    // Pico-side safety: pulse range from the calibrated min/max angle, speed limit in µs per second
     servos: SERVOS.map(s => {
       const c = cfg.servos[s.id], a = [angleToUs(s.id, +c.minAngle), angleToUs(s.id, +c.maxAngle)];
       return { id: s.id, pin: +c.pin, freq: 50, min: Math.min(...a), max: Math.max(...a), slew: Math.round(+cfg.safety.fwSlew * Math.abs(c.maxUs - c.minUs) / c.range) };
     }),
     timeout: Math.round(+cfg.safety.timeout * 1000),
-    led: { pin: +L.pin, count: L.enabled ? clamp(+L.count, 0, 60) : 0, bpp: +L.bpp, timing: +L.khz === 800 ? 1 : 0, order: L.order, type: L.type },
+    led: { pin: +L.pin, count: L.enabled ? +L.count : 0, bpp: +L.bpp, timing: +L.khz === 800 ? 1 : 0, order: L.order, type: L.type },
   };
 }
 const hexRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) || 0);
@@ -1535,19 +1450,19 @@ function ledPacket(save) {
 }
 function updateConn() {
   const dot = $('#connDot'), txt = $('#connText'), btn = $('#connBtn');
-  dot.className = 'dot' + (link.connected && !link.booting ? ' ok' : link.connecting || link.booting ? ' warn' : '');
-  txt.textContent = flashing ? 'Uploading firmware…' : link.booting ? 'Arduino starting…' : link.connected ? `USB connected${link.rtt != null ? ' · ' + link.rtt + ' ms' : ''}` : link.connecting ? 'Connecting…' : 'Disconnected';
+  dot.className = 'dot' + (link.connected ? ' ok' : link.connecting ? ' warn' : '');
+  txt.textContent = flashing ? 'Uploading main.py…' : link.connected ? `USB connected${link.rtt != null ? ' · ' + link.rtt + ' ms' : ''}` : link.connecting ? 'Connecting…' : 'Disconnected';
   btn.textContent = link.connected || link.connecting ? 'Disconnect' : 'Connect USB';
   btn.disabled = flashing;
   renderFwTag();
 }
 // keep-alive + latency
 setInterval(() => {
-  if (!link.connected || link.booting) return;
+  if (!link.connected) return;
   link.send({ t: 'ping', id: Math.round(performance.now()) });
   if (performance.now() - link.lastPong > 6000 && !link.silentWarned) {
     link.silentWarned = true;
-    log('No reply from the Arduino — is the ArmCtl firmware on it? Click “Upload to Arduino” in Settings, or try “Restart Arduino”.', 'er');
+    log('No reply from the Pico — is main.py on it? Click “Upload to Pico” in Settings, or try “Restart Pico”.', 'er');
   }
 }, 2000);
 
@@ -2020,6 +1935,7 @@ function renderMode() {
 /* =====================================================================
    Safety system
    ===================================================================== */
+const FW_SAFE = 'armctl-usb-1.1';            // first main.py with the Pico-side limits
 // Stops a move that would hit something. Moving out of (or not deeper into) a collision is allowed.
 function guardMotion(prev) {
   if (!cfg.safety.collide) return;
@@ -2044,26 +1960,25 @@ function safetyEvent(msg, warn = false) {
 }
 let cfgSendT = 0;
 function sendCfgSoon() { clearTimeout(cfgSendT); cfgSendT = setTimeout(() => { if (link.connected) link.send(cfgPacket(false)); }, 600); }
-const fwHasSafety = () => link.connected && isUnoFw(link.fw);
+const fwHasSafety = () => link.connected && link.fw >= FW_SAFE;
 function renderSafety() {
   const S = cfg.safety, J = cfg.joints, on = (b, a = 'On', o = 'Off') => `<span class="tag ${b ? 'ok' : 'err'}">${b ? a : o}</span>`;
-  const fw = !link.connected ? '<span class="tag">Not connected</span>' : fwHasSafety() ? on(true, 'Active on Arduino') : '<span class="tag err">Upload the firmware</span>';
+  const fw = !link.connected ? '<span class="tag">Not connected</span>' : fwHasSafety() ? on(true, 'Active on Pico') : '<span class="tag err">Old main.py</span>';
   const rows = [
     ['Joint limits', JOINTS.map(j => `${j.name} ${J[j.id].min}…${J[j.id].max}${j.unit}`).join(' · '), on(true)],
     ['Collision guard', `Table (${S.floorMargin} mm clearance), base, shoulder and upper arm`, on(S.collide)],
     ['Speed & acceleration', `≤ ${cfg.typeSpeed.MG90S} °/s, ${S.accel} °/s² ramps`, on(true)],
     ['Animation check', 'Red segments (too fast, unreachable, collision) can\'t play on the real arm', on(true)],
     ['E-STOP (Esc)', S.estopMode === 'release' ? 'Releases the servos' : 'Freezes the arm in place', on(true)],
-    ['Arduino pulse limits', 'Each servo clamped to its calibrated Min/Max angle', fw],
-    ['Arduino speed limit', `≤ ${S.fwSlew} °/s even if the page sends a jump`, fw],
-    ['Lost connection', `Arduino holds position after ${S.timeout} s without commands`, fw],
-    ['Power check', 'Warns if the Arduino restarts by itself (servos powered from the Uno)', fw],
+    ['Pico pulse limits', 'Each servo clamped to its calibrated Min/Max angle', fw],
+    ['Pico speed limit', `≤ ${S.fwSlew} °/s even if the page sends a jump`, fw],
+    ['Lost connection', `Pico holds position after ${S.timeout} s without commands`, fw],
   ];
   $('#safeTable').innerHTML = '<tr><th>Protection</th><th>What it does</th><th>Status</th></tr>' + rows.map(r => `<tr><td><b>${r[0]}</b></td><td class="small">${r[1]}</td><td>${r[2]}</td></tr>`).join('');
   const st = $('#safeState'), off = !S.collide;
   st.textContent = off ? 'collision guard off' : 'protected'; st.className = 'tag ' + (off ? 'err' : 'ok');
   const ft = $('#fwSafeTag');
-  ft.textContent = !link.connected ? 'Not connected' : fwHasSafety() ? 'Active on Arduino' : 'Upload the firmware';
+  ft.textContent = !link.connected ? 'Not connected' : fwHasSafety() ? 'Active on Pico' : 'Old main.py — update it';
   ft.className = 'tag' + (fwHasSafety() ? ' ok' : link.connected ? ' err' : '');
 }
 
@@ -2194,7 +2109,7 @@ function refreshCalInfo() {
   for (const d of $$('#calServos details')) {
     const id = d.dataset.servo, sv = SERVOS.find(s => s.id === id), s = cfg.servos[id];
     const a = id in state.overrides ? state.overrides[id] : servoAngle(id, state.current[sv.joint]);
-    $('[data-pin]', d).textContent = pinName(+s.pin);
+    $('[data-pin]', d).textContent = 'GP' + s.pin;
     const out = $('[data-out]', d); out.textContent = `${round(a)}° · ${angleToUs(id, a)} µs${id in state.overrides ? ' · direct' : ''}`;
     out.className = 'tag' + (id in state.overrides ? ' err' : '');
     $('[data-raw]', d).textContent = round(a) + '°';
@@ -2222,76 +2137,72 @@ function buildLimitTable() {
 /* =====================================================================
    Pins UI
    ===================================================================== */
+const pwmOf = p => `${(p >> 1) & 7}${p & 1 ? 'B' : 'A'}`;
 function pinProblems() {
   const msgs = [], bad = new Set();
-  const uses = SERVOS.map(s => ({ who: s.name, pin: +cfg.servos[s.id].pin }));
-  if (cfg.led.enabled) uses.push({ who: 'NeoPixel', pin: +cfg.led.pin });
+  const uses = SERVOS.map(s => ({ who: s.name, pin: +cfg.servos[s.id].pin, pwm: true }));
+  if (cfg.led.enabled) uses.push({ who: 'NeoPixel', pin: +cfg.led.pin, pwm: false });
   for (let i = 0; i < uses.length; i++) for (let k = i + 1; k < uses.length; k++) {
     const a = uses[i], b = uses[k];
-    if (a.pin === b.pin) { msgs.push(['err', `${a.who} and ${b.who} are both on ${pinName(a.pin)}.`]); bad.add(a.who); bad.add(b.who); }
+    if (a.pin === b.pin) { msgs.push(['err', `${a.who} and ${b.who} are both on GP${a.pin}.`]); bad.add(a.who); bad.add(b.who); }
+    else if (a.pwm && b.pwm && pwmOf(a.pin) === pwmOf(b.pin)) { msgs.push(['err', `${a.who} (GP${a.pin}) and ${b.who} (GP${b.pin}) share PWM channel ${pwmOf(a.pin)} — they would always output the same pulse.`]); bad.add(a.who); bad.add(b.who); }
   }
-  for (const u of uses) {
-    if (!BOARD_PINS.includes(u.pin)) { msgs.push(['err', `${u.who}: pin ${u.pin} can't be used on the Uno (D0/D1 are the USB serial port).`]); bad.add(u.who); }
-    else if (u.pin === 13 && u.who !== 'NeoPixel') msgs.push(['warn', `${u.who} is on D13, which blinks while the Uno starts: the servo may twitch at power-up.`]);
-  }
-  return { msgs, bad, errors: msgs.filter(m => m[0] === 'err').length };
+  for (const u of uses) if (!PICO_PINS.includes(u.pin)) { msgs.push(['err', `${u.who}: GP${u.pin} is not available on the Pico W.`]); bad.add(u.who); }
+  return { msgs, bad };
 }
-function pinOptions(sel) { return BOARD_PINS.map(p => `<option value="${p}"${+sel === p ? ' selected' : ''}>${pinName(p)}</option>`).join(''); }
+function pinOptions(sel) { return PICO_PINS.map(p => `<option value="${p}"${+sel === p ? ' selected' : ''}>GP${p}</option>`).join(''); }
 function buildPins() {
   const t = $('#pinTable');
-  t.innerHTML = '<tr><th>Output</th><th>Type</th><th>Pin</th><th>Wire</th><th></th></tr>' +
+  t.innerHTML = '<tr><th>Output</th><th>Type</th><th>GPIO</th><th>PWM</th><th>Wire</th><th></th></tr>' +
     SERVOS.map(s => `<tr data-who="${esc(s.name)}"><td><b>${s.name} servo</b></td><td><span class="tag">${s.type}</span></td>
-      <td><select data-bind="servos.${s.id}.pin" data-num>${pinOptions(cfg.servos[s.id].pin)}</select></td>
+      <td><select data-bind="servos.${s.id}.pin" data-num>${pinOptions(cfg.servos[s.id].pin)}</select></td><td class="mono small" data-pwm></td>
       <td class="small muted">Signal wire (orange or yellow)</td><td data-st></td></tr>`).join('') +
     `<tr data-who="NeoPixel"><td><b>NeoPixel data</b> <span class="small muted">(optional)</span></td><td><span class="tag" id="pinLedType"></span></td>
-      <td><select data-bind="led.pin" data-num>${pinOptions(cfg.led.pin)}</select></td>
+      <td><select data-bind="led.pin" data-num>${pinOptions(cfg.led.pin)}</select></td><td class="mono small">PIO</td>
       <td class="small muted">Data in, with a 330 Ω resistor in series</td><td data-st></td></tr>`;
   bindAll(t);
   $('#ledPin').innerHTML = pinOptions(cfg.led.pin);
   refreshPins();
 }
 function refreshPins() {
-  const { msgs, bad, errors } = pinProblems();
+  const { msgs, bad } = pinProblems();
   for (const tr of $$('#pinTable tr[data-who]')) {
     const who = tr.dataset.who, sv = SERVOS.find(s => s.name === who);
+    if (sv) $('[data-pwm]', tr).textContent = pwmOf(+cfg.servos[sv.id].pin);
     $('[data-st]', tr).innerHTML = bad.has(who) ? '<span class="tag err">conflict</span>' : '<span class="tag ok">ok</span>';
     const sel = $('select', tr); const want = sv ? cfg.servos[sv.id].pin : cfg.led.pin; if (+sel.value !== +want) sel.value = want;
   }
   $('#pinLedType').textContent = cfg.led.type;
   $('#pinMsgs').innerHTML = msgs.map(([c, m]) => `<div class="note ${c}">${esc(m)}</div>`).join('');
-  const st = $('#pinState'); st.textContent = errors ? `${errors} problem${errors > 1 ? 's' : ''}` : msgs.length ? 'valid · check note' : 'valid'; st.className = 'tag ' + (errors ? 'err' : 'ok');
-  $('#pinApply').disabled = errors > 0;
+  const st = $('#pinState'); st.textContent = msgs.length ? `${msgs.length} problem${msgs.length > 1 ? 's' : ''}` : 'valid'; st.className = 'tag ' + (msgs.length ? 'err' : 'ok');
+  $('#pinApply').disabled = msgs.length > 0;
   drawPinout();
   $$('#calServos details').length && refreshCalInfo();
 }
-function drawPinout() {                     // Arduino Uno R3, top view, USB on the left
+function drawPinout() {
+  const left = ['GP0', 'GP1', 'GND', 'GP2', 'GP3', 'GP4', 'GP5', 'GND', 'GP6', 'GP7', 'GP8', 'GP9', 'GND', 'GP10', 'GP11', 'GP12', 'GP13', 'GND', 'GP14', 'GP15'];
+  const right = ['VBUS', 'VSYS', 'GND', '3V3_EN', '3V3', 'ADC_VREF', 'GP28', 'AGND', 'GP27', 'GP26', 'RUN', 'GP22', 'GND', 'GP21', 'GP20', 'GP19', 'GP18', 'GND', 'GP17', 'GP16'];
   const assigned = {};
-  for (const s of SERVOS) (assigned[pinName(+cfg.servos[s.id].pin)] ||= []).push(s.name);
-  if (cfg.led.enabled) (assigned[pinName(+cfg.led.pin)] ||= []).push('NeoPixel');
-  const bx = 40, by = 100, bw = 470, bh = 190, dx = 19.5;
-  let s = `<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="10" fill="#0b7d86" stroke="#075a61"/>
-    <rect x="${bx - 22}" y="${by + 28}" width="62" height="48" rx="3" fill="#c3c8ce" stroke="#8a9199"/>
-    <text x="${bx + 9}" y="${by + 56}" text-anchor="middle" style="fill:#333;font-size:9px">USB</text>
-    <rect x="${bx - 12}" y="${by + 128}" width="52" height="40" rx="3" fill="#202326"/>
-    <rect x="${bx + 250}" y="${by + 95}" width="150" height="34" rx="3" fill="#202326"/>
-    <text x="${bx + 325}" y="${by + 116}" text-anchor="middle" style="fill:#cfd6dc;font-size:9px">ATmega328P</text>
-    <text x="${bx + 160}" y="${by + 105}" text-anchor="middle" style="fill:#e8f6f7;font-size:22px;font-weight:800;font-family:system-ui">UNO</text>`;
-  const pin = (x, y, name, label, top) => {
-    const a = assigned[name], power = /GND|5V|3\.3V|VIN|IOREF|RESET|AREF/.test(name);
-    const fill = a ? (a.length > 1 ? 'var(--danger)' : 'var(--accent)') : power ? (name.includes('GND') ? '#333' : '#c0392b') : '#1d1f22';
-    s += `<rect x="${x - 6}" y="${y - 6}" width="12" height="12" rx="2" fill="${fill}" stroke="#e8eaed" stroke-width="1"/>`;
-    s += `<text x="${x}" y="${top ? y + 18 : y - 11}" text-anchor="middle" style="fill:#e8f6f7;font-size:8px">${label}</text>`;
-    if (a) s += `<text class="lbl" transform="translate(${x + 3},${top ? y - 12 : y + 15}) rotate(${top ? -50 : 50})" text-anchor="${top ? 'start' : 'start'}" style="fill:${a.length > 1 ? 'var(--danger)' : 'var(--accent)'}">${esc(a.join(' + '))}</text>`;
+  for (const s of SERVOS) (assigned['GP' + cfg.servos[s.id].pin] ||= []).push(s.name);
+  if (cfg.led.enabled) (assigned['GP' + cfg.led.pin] ||= []).push('NeoPixel');
+  const bx = 200, bw = 120, top = 26, dy = 14.4;
+  let s = `<rect x="${bx}" y="8" width="${bw}" height="${top + dy * 20}" rx="8" fill="#1f7a3a" stroke="#14532a"/>
+    <rect x="${bx + bw / 2 - 16}" y="0" width="32" height="18" rx="3" fill="#b8bec6" stroke="#8a9199"/>
+    <rect x="${bx + 35}" y="${top + 60}" width="50" height="50" rx="3" fill="#202326"/>
+    <text x="${bx + bw / 2}" y="${top + 128}" text-anchor="middle" style="fill:#cfe8d6;font-size:9px">RP2040</text>
+    <rect x="${bx + 30}" y="${top + 190}" width="60" height="44" rx="3" fill="#c3c8ce" stroke="#9aa1a8"/>
+    <text x="${bx + bw / 2}" y="${top + 216}" text-anchor="middle" style="fill:#333;font-size:9px">CYW43439</text>`;
+  const pin = (x, y, name, num, side) => {
+    const a = assigned[name], power = /GND|V|3V3|RUN|ADC/.test(name);
+    const fill = a ? (a.length > 1 ? 'var(--danger)' : 'var(--accent)') : power ? (name.includes('GND') ? '#333' : '#c0392b') : '#d4b25c';
+    s += `<circle cx="${x}" cy="${y}" r="4.6" fill="${fill}" stroke="#0d3b1d"/>`;
+    const tx = side === 'L' ? x - 10 : x + 10, anchor = side === 'L' ? 'end' : 'start';
+    s += `<text x="${tx}" y="${y + 3}" text-anchor="${anchor}">${name}</text>`;
+    s += `<text x="${side === 'L' ? x + 9 : x - 9}" y="${y + 3}" text-anchor="${side === 'L' ? 'start' : 'end'}" style="fill:#cfe8d6;font-size:7.5px">${num}</text>`;
+    if (a) s += `<text class="lbl" x="${side === 'L' ? tx - 46 : tx + 46}" y="${y + 3}" text-anchor="${anchor}" style="fill:${a.length > 1 ? 'var(--danger)' : 'var(--accent)'}">${esc(a.join(' + '))}</text>`;
   };
-  // top header, right to left: D0…D7 | D8…D13, GND, AREF, SDA, SCL
-  const top = ['D0', 'D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', null, 'D8', 'D9', 'D10', 'D11', 'D12', 'D13', 'GND', 'AREF', 'SDA', 'SCL'];
-  const pwm = new Set(['D3', 'D5', 'D6', 'D9', 'D10', 'D11']);
-  let x = bx + bw - 16;
-  for (const n of top) { if (!n) { x -= 10; continue; } pin(x, by + 12, n, n === 'D0' ? 'RX0' : n === 'D1' ? 'TX1' : n.startsWith('D') ? (pwm.has(n) ? '~' : '') + n.slice(1) : n, true); x -= dx; }
-  // bottom header, left to right: power | A0…A5
-  const bottom = ['IOREF', 'RESET', '3.3V', '5V', 'GND', 'GND', 'VIN', null, 'A0', 'A1', 'A2', 'A3', 'A4', 'A5'];
-  x = bx + 190;
-  for (const n of bottom) { if (!n) { x += 10; continue; } pin(x, by + bh - 12, n, n === '3.3V' ? '3V3' : n === 'IOREF' ? 'IOR' : n === 'RESET' ? 'RST' : n, false); x += dx; }
+  left.forEach((n, i) => pin(bx + 8, top + i * dy + 8, n, i + 1, 'L'));
+  right.forEach((n, i) => pin(bx + bw - 8, top + i * dy + 8, n, 40 - i, 'R'));
   $('#pinout').innerHTML = s;
 }
 
@@ -2328,7 +2239,7 @@ function liveLedSend() {
   clearTimeout(ledSendT);
   ledSendT = setTimeout(() => { if (link.connected) link.send(ledPacket(false)); }, 150);
 }
-// Browser preview of the firmware's LED effects (same idea as renderLeds() in armctl.ino)
+// Browser preview of the firmware's LED effects (same maths as render_led in main.py)
 function wheel(p) { p = Math.floor(p) % 256; if (p < 0) p += 256; if (p < 85) return [255 - p * 3, p * 3, 0]; if (p < 170) { p -= 85; return [0, 255 - p * 3, p * 3]; } p -= 170; return [p * 3, 0, 255 - p * 3]; }
 let ledT = 0, ledLast = 0;
 function renderLedPreview(now) {
@@ -2410,7 +2321,7 @@ function connHint() {
   const ok = 'serial' in navigator, t = $('#serialSupport');
   t.textContent = ok ? 'Web Serial ready' : 'not supported here'; t.className = 'tag ' + (ok ? 'ok' : 'err');
   $('#connHint').textContent = ok
-    ? 'Plug the Arduino Uno into this computer with a USB cable and click “Connect USB”. Close the Arduino IDE’s Serial Monitor first — only one program can use the port. Commands are only sent in Live mode.'
+    ? 'Plug the Pico into this computer with a USB data cable and click “Connect USB”. Close Thonny first — only one program can use the port. Commands are only sent in Live mode.'
     : 'This browser can’t talk to USB devices. Use Chrome or Edge on a computer (Windows, macOS, Linux, ChromeOS). The simulator works everywhere.';
 }
 
@@ -2787,94 +2698,62 @@ function download(name, text, type = 'text/plain') {
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name;
   document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
 }
-// The settings built into the firmware (same order as `struct Config` in the sketch)
-function fwSettings() {
-  if (pinProblems().errors) { toast('Fix the pin conflicts first'); return null; }
-  const pk = cfgPacket(false), f = ledPacket(false).fx, L = pk.led;
-  const st = { timeout: pk.timeout, servos: pk.servos.map(({ pin, min, max, slew }) => ({ pin, min, max, slew })),
-    ledPin: L.pin, ledCount: L.count, ledBpp: L.bpp, ledKhz800: L.timing, order: L.order.replace(/[^RGBW]/g, ''),
-    fx: [Math.max(0, LED_MODES.indexOf(f.mode)), ...f.c1, ...f.c2, f.bri, f.speed] };
-  st.body = `${st.timeout}, { ${st.servos.map(s => `{${s.pin}, ${s.min}, ${s.max}, ${s.slew}}`).join(', ')} }, ` +
-    `${st.ledPin}, ${st.ledCount}, ${st.ledBpp}, ${st.ledKhz800}, "${st.order}", { ${st.fx.join(', ')} }`;
-  let h = 0x5A17; for (const ch of st.body) h = (h * 31 + ch.charCodeAt(0)) & 0xffff;      // EEPROM tag for exactly these settings
-  st.magic = h;
-  return st;
-}
 function firmware() {
-  const st = fwSettings(); if (!st) return null;
-  const magic = '0x' + st.magic.toString(16).toUpperCase().padStart(4, '0');
+  const pk = cfgPacket(false), lp = ledPacket(false);
+  const fwCfg = { servos: pk.servos, led: pk.led, fx: lp.fx, timeout: pk.timeout };
+  if (pinProblems().msgs.length) { toast('Fix the pin conflicts first'); return null; }
   return $('#fwTemplate').textContent.replace(/^\n/, '')
-    .replace('{{USE_NEOPIXEL}}', cfg.led.enabled ? '1' : '0')
-    .replace('{{CFG}}', `{ ${magic}, ${st.body} }`);
+    .replace('{{CFG}}', () => JSON.stringify(fwCfg).replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
 }
 
-/* ---------- ready-made firmware, uploaded from the page ----------
-   #fwImages holds armctl compiled for the Uno (NeoPixels off and on) by tools/build-firmware.js.
-   The settings sit at a known place in the image (cfgAt) and are replaced by yours before uploading. */
-function fwConfigBytes(st) {   // struct Config on the AVR: no padding, little-endian
-  const b = [], u8 = v => b.push(clamp(Math.round(+v) || 0, 0, 255)), u16 = v => { v = clamp(Math.round(+v) || 0, 0, 65535); b.push(v & 255, v >> 8); };
-  u16(st.magic); u16(st.timeout);
-  for (const s of st.servos) { u8(s.pin); u16(s.min); u16(s.max); u16(s.slew); }
-  u8(st.ledPin); u8(st.ledCount); u8(st.ledBpp); u8(st.ledKhz800);
-  for (let i = 0; i < 5; i++) b.push(i < 4 ? st.order.charCodeAt(i) || 0 : 0);
-  st.fx.forEach(u8);
-  return Uint8Array.from(b);
-}
-function fwImage() {
-  const st = fwSettings(); if (!st) return null;
-  const im = fwImages.neopixel?.[cfg.led.enabled ? 1 : 0];
-  if (!im) { toast('This copy of the page has no built-in firmware — use “Download armctl.ino”'); return null; }
-  const bin = Uint8Array.from(atob(im.data), c => c.charCodeAt(0)), cb = fwConfigBytes(st);
-  if (cb.length !== 52) throw new Error('settings size');
-  bin.set(cb, im.cfgAt);
-  return bin;
-}
-
-// STK500 v1: what the Uno's bootloader (Optiboot) speaks for a moment after every reset
-class Stk500 {
-  constructor(port) { this.port = port; this.buf = []; this.wake = null; this.closed = false; }
-  async open(baud) {
-    await this.port.open({ baudRate: baud, bufferSize: 4096 });
-    this.writer = this.port.writable.getWriter(); this.reader = this.port.readable.getReader(); this.closed = false;
+/* ---------- copying main.py onto the Pico from the page ----------
+   MicroPython's raw REPL over the same USB port: Ctrl-C stops main.py, Ctrl-A enters raw mode, each block of
+   code ends with Ctrl-D and is answered with "OK", its output, Ctrl-D, any error, Ctrl-D and ">". */
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+class PicoRepl {
+  constructor(port) { this.port = port; this.buf = ''; this.wake = null; this.closed = false; }
+  async open() {
+    await this.port.open({ baudRate: 115200 });
+    this.writer = this.port.writable.getWriter(); this.reader = this.port.readable.getReader();
     this.pump();
   }
   async pump() {
-    try { while (true) { const { value, done } = await this.reader.read(); if (done) break; for (const v of value) this.buf.push(v); this.wake?.(); } }
+    try { while (true) { const { value, done } = await this.reader.read(); if (done) break; for (const v of value) this.buf += String.fromCharCode(v); this.wake?.(); } }
     catch (e) {}
     this.closed = true; this.wake?.();
   }
-  async read(n, ms) {
+  async until(mark, ms) {                       // text before `mark`, which is consumed too; null on timeout
     const end = performance.now() + ms;
-    while (this.buf.length < n) {
+    let i;
+    while ((i = this.buf.indexOf(mark)) < 0) {
       const left = end - performance.now();
       if (left <= 0 || this.closed) return null;
-      await new Promise(r => { this.wake = r; setTimeout(r, left); });
+      await new Promise(r => { this.wake = r; setTimeout(r, Math.min(left, 50)); });
       this.wake = null;
     }
-    return this.buf.splice(0, n);
+    const before = this.buf.slice(0, i); this.buf = this.buf.slice(i + mark.length);
+    return before;
   }
-  write(bytes) { return this.writer.write(Uint8Array.from(bytes)); }
-  async cmd(bytes, n = 0, ms = 500) {           // every command ends with CRC_EOP (0x20); answer: INSYNC (0x14) … OK (0x10)
-    await this.write([...bytes, 0x20]);
-    const r = await this.read(n + 2, ms);
-    if (!r) throw new Error('the bootloader stopped answering');
-    if (r[0] !== 0x14 || r[n + 1] !== 0x10) throw new Error('unexpected answer from the bootloader');
-    return r.slice(1, n + 1);
+  async write(text) {                           // small pieces: some USB-serial stacks drop data in big bursts
+    const b = Uint8Array.from(text, c => c.charCodeAt(0));
+    for (let i = 0; i < b.length; i += 256) { await this.writer.write(b.subarray(i, i + 256)); if (b.length > 256) await sleep(4); }
   }
-  async reset() {                               // DTR pulse, like the Arduino IDE: the Uno restarts into its bootloader
-    await this.port.setSignals({ dataTerminalReady: false, requestToSend: false });
-    await sleep(250);
-    await this.port.setSignals({ dataTerminalReady: true, requestToSend: true });
-    await sleep(50);
-  }
-  async sync() {                                // the bootloader only waits about a second after the reset
-    for (let i = 0; i < 10; i++) {
-      this.buf.length = 0;
-      await this.write([0x30, 0x20]);
-      const r = await this.read(2, 150);
-      if (r && r[0] === 0x14 && r[1] === 0x10) { await sleep(30); this.buf.length = 0; return true; }
+  async enterRaw() {
+    await this.write('\r\x03\x03'); await sleep(150); this.buf = '';
+    for (let i = 0; i < 3; i++) {
+      await this.write('\r\x01');
+      if (await this.until('raw REPL; CTRL-B to exit\r\n>', 1000) != null) return true;
+      await this.write('\x03\x03'); await sleep(100); this.buf = '';
     }
     return false;
+  }
+  async exec(code, ms = 5000) {
+    await this.write(code + '\x04');
+    if (await this.until('OK', 2000) == null) throw new Error('MicroPython stopped answering');
+    const out = await this.until('\x04', ms), err = out == null ? null : await this.until('\x04>', ms);
+    if (err == null) throw new Error('MicroPython stopped answering');
+    if (err.trim()) throw new Error('MicroPython error: ' + err.trim().split('\n').pop());
+    return out;
   }
   async close() {
     try { await this.reader?.cancel(); } catch (e) {}
@@ -2883,81 +2762,68 @@ class Stk500 {
     try { await this.port.close(); } catch (e) {}
   }
 }
-const sleep = ms => new Promise(r => setTimeout(r, ms));
+const pyBytes = b => Array.from(b, v => v >= 32 && v < 127 && v !== 39 && v !== 92 ? String.fromCharCode(v) : '\\x' + v.toString(16).padStart(2, '0')).join('');
 
-async function flashUno(port, image, progress) {
-  const PAGE = 128;                             // ATmega328P flash page
-  const stk = new Stk500(port);
-  let synced = false;
-  for (const baud of [115200, 57600]) {         // Uno (Optiboot) / boards with the old bootloader
-    await stk.open(baud);
-    await stk.reset();
-    synced = await stk.sync();
-    if (synced) break;
-    await stk.close();
-  }
-  if (!synced) throw new Error('NOSYNC');
+async function uploadMainPy(port, text, progress) {
+  const data = new TextEncoder().encode(text), CHUNK = 512;
+  const repl = new PicoRepl(port);
+  await repl.open();
   try {
-    const sig = await stk.cmd([0x75], 3);
-    if (sig[0] !== 0x1E || sig[1] !== 0x95) throw new Error('This board is not an Arduino Uno (ATmega328P) — chip signature ' + sig.map(v => v.toString(16).padStart(2, '0')).join(' '));
-    await stk.cmd([0x50]);                      // enter programming mode
-    const pages = Math.ceil(image.length / PAGE);
-    const addr = a => stk.cmd([0x55, (a >> 1) & 255, a >> 9]);         // word address
-    for (let p = 0; p < pages; p++) {
-      const a = p * PAGE, data = new Uint8Array(PAGE).fill(0xFF);
-      data.set(image.subarray(a, a + PAGE));
-      await addr(a);
-      await stk.cmd([0x64, 0, PAGE, 0x46, ...data], 0, 1000);           // program page ('F' = flash)
-      progress(0.85 * (p + 1) / pages, 'Writing');
+    if (!await repl.enterRaw()) throw new Error('NOREPL');
+    // written to a temporary file first, so an interrupted upload leaves the old main.py working
+    await repl.exec("f=open('main.py.tmp','wb')\nw=f.write");
+    for (let i = 0; i < data.length; i += CHUNK) {
+      await repl.exec(`w(b'${pyBytes(data.subarray(i, i + CHUNK))}')`);
+      progress(0.9 * Math.min(1, (i + CHUNK) / data.length), 'Copying main.py');
     }
-    for (let p = 0; p < pages; p++) {                                   // read it back
-      const a = p * PAGE, n = Math.min(PAGE, image.length - a);
-      await addr(a);
-      const got = await stk.cmd([0x74, 0, PAGE, 0x46], PAGE, 1000);
-      for (let i = 0; i < n; i++) if (got[i] !== image[a + i]) throw new Error(`Verify failed at byte ${a + i} — try again`);
-      progress(0.85 + 0.15 * (p + 1) / pages, 'Checking');
-    }
-    await stk.cmd([0x51]);                      // leave programming mode: the new firmware starts
-  } finally { await stk.close(); }
+    await repl.exec('f.close()');
+    progress(0.95, 'Checking');
+    const got = (await repl.exec("f=open('main.py.tmp','rb')\nd=f.read()\nf.close()\nprint(len(d),sum(d))\nd=None")).trim();
+    const want = `${data.length} ${data.reduce((a, v) => a + v, 0)}`;
+    if (got !== want) throw new Error(`Check failed (${got} instead of ${want}) — try again`);
+    // arm_cfg.json holds settings saved from the page; it would override the settings in the new main.py
+    await repl.exec("import os\nfor n in ('main.py','arm_cfg.json'):\n  try:\n    os.remove(n)\n  except OSError:\n    pass\nos.rename('main.py.tmp','main.py')");
+    progress(1, 'Starting main.py');
+    await repl.write('\x02'); await sleep(100);  // back to the normal prompt…
+    await repl.write('\x04'); await sleep(600);  // …and soft reboot: main.py starts
+  } finally { await repl.close(); }
 }
 
 async function uploadFirmware() {
   if (flashing) return;
   if (!('serial' in navigator)) { toast('Uploading needs Chrome or Edge on a computer'); return; }
-  const image = fwImage(); if (!image) return;
+  const text = firmware(); if (!text) return;
   const st = $('#fwStatus'), bar = $('#fwBar'), btn = $('#fwFlash');
   const status = (t, c = '') => { st.textContent = t; st.className = 'small ' + c; };
   let port = link.port || selectedPort();
   if (!port) { try { port = await navigator.serial.requestPort(); await refreshPorts(); choosePort(port); } catch (e) { return; } }
-  flashing = true; btn.disabled = true; bar.hidden = false; updateConn(); bar.firstElementChild.style.width = '0';
+  flashing = true; btn.disabled = true; bar.hidden = false; bar.firstElementChild.style.width = '0';
   stopAnim(); stopRec();
   if (link.connected || link.connecting) await link.close();
   updateConn();
   const t0 = performance.now();
-  status('Restarting the Arduino into its bootloader…');
-  log(`Uploading ${fwImages.fw} (${image.length} bytes, NeoPixels ${cfg.led.enabled ? 'on' : 'off'}) to ${portName(port)}…`);
+  status('Stopping main.py on the Pico…');
+  log(`Copying main.py (${text.length} bytes) to ${portName(port)}…`);
   try {
-    await flashUno(port, image, (f, what) => { bar.firstElementChild.style.width = (f * 100).toFixed(1) + '%'; status(`${what}… ${Math.round(f * 100)}%`); });
+    await uploadMainPy(port, text, (f, what) => { bar.firstElementChild.style.width = (f * 100).toFixed(1) + '%'; status(`${what}… ${Math.round(f * 100)}%`); });
     const secs = ((performance.now() - t0) / 1000).toFixed(1);
-    status(`Firmware uploaded and checked in ${secs} s.`, 'ok'); log(`Firmware uploaded and checked (${secs} s)`, 'rx');
-    toast('Firmware uploaded — connecting');
-    await sleep(300);
+    status(`main.py copied to the Pico and checked in ${secs} s.`, 'ok'); log(`main.py copied and checked (${secs} s)`, 'rx');
+    toast('main.py uploaded — connecting');
     await link.open(port);
   } catch (e) {
     let msg = e.message;
-    if (e.message === 'NOSYNC') msg = 'The Arduino didn’t answer. Check that this is the Uno’s port and that no other program (like the Serial Monitor) has it open. If it still fails, press the Uno’s reset button right after clicking Upload.';
-    else if (e.name === 'NetworkError' || e.name === 'InvalidStateError') msg = 'Couldn’t open the port — close the Arduino IDE’s Serial Monitor or any other program using it.';
+    if (msg === 'NOREPL') msg = 'MicroPython didn’t answer on this port. Install MicroPython on the Pico first (step 1), make sure this is the Pico’s port, and close Thonny.';
+    else if (e.name === 'NetworkError' || e.name === 'InvalidStateError') msg = 'Couldn’t open the port — close Thonny or any other program using it.';
     status('Upload failed: ' + msg, 'er'); log('Upload failed: ' + msg, 'er'); toast('Upload failed');
   } finally {
     flashing = false; btn.disabled = false; updateConn(); setTimeout(() => { if (!flashing) bar.hidden = true; }, 1500);
-    renderFwTag();
   }
 }
 function renderFwTag() {
   const tag = $('#fwTag'); if (!tag) return;
   const on = link.connected && link.fw;
-  tag.textContent = on ? 'on the Uno: ' + link.fw : fwImages.fw ? 'built in: ' + fwImages.fw : 'not built in';
-  tag.className = 'tag' + (on && isUnoFw(link.fw) ? ' ok' : '');
+  tag.textContent = on ? 'on the Pico: ' + link.fw : 'not connected';
+  tag.className = 'tag' + (on && link.fw >= FW_SAFE ? ' ok' : '');
 }
 
 /* =====================================================================
@@ -3014,7 +2880,7 @@ function setupEvents() {
   });
   // pins
   $('#pinApply').addEventListener('click', () => {
-    if (!link.connected) { toast('Connect to the Arduino first (pins are also saved here and in the firmware download)'); return; }
+    if (!link.connected) { toast('Connect to the Pico first (pins are also saved here and in the firmware export)'); return; }
     link.send(cfgPacket($('#pinSave').checked)); link.lastSent = ''; toast('Pin configuration sent');
   });
   $('#pinDefaults').addEventListener('click', () => {
@@ -3023,12 +2889,12 @@ function setupEvents() {
   });
   // leds
   $('#ledApply').addEventListener('click', () => {
-    if (!link.connected) { toast('Connect to the Arduino first'); return; }
-    link.send(cfgPacket(true)); link.send(ledPacket(true)); toast('LED settings sent and saved on the Arduino');
+    if (!link.connected) { toast('Connect to the Pico first'); return; }
+    link.send(cfgPacket(true)); link.send(ledPacket(true)); toast('LED settings sent and saved on the Pico');
   });
   // settings
   $('#fwFlash').addEventListener('click', uploadFirmware);
-  $('#fwDownload').addEventListener('click', () => { const t = firmware(); if (t) { download('armctl.ino', t, 'text/plain'); toast('armctl.ino downloaded — open it in the Arduino IDE and upload'); } });
+  $('#fwDownload').addEventListener('click', () => { const t = firmware(); if (t) { download('main.py', t, 'text/x-python'); toast('main.py downloaded'); } });
   $('#cfgExport').addEventListener('click', () => download('armctl-settings.json', JSON.stringify(cfg, null, 2), 'application/json'));
   $('#cfgImport').addEventListener('click', () => $('#cfgFile').click());
   $('#cfgFile').addEventListener('change', async e => {
@@ -3043,11 +2909,10 @@ function setupEvents() {
     clearTimeout(saveTimer); location.reload();
   });
   $('#logClear').addEventListener('click', () => $('#console').innerHTML = '');
-  $('#boardReset').addEventListener('click', () => link.restart());
+  $('#picoReset').addEventListener('click', () => { if (!link.connected) { toast('Not connected'); return; } link.raw('\x03\x03\x04'); log('Restarting main.py on the Pico…'); setTimeout(() => { link.send({ t: 'hello' }); link.send(cfgPacket(false)); link.send(ledPacket(false)); link.lastSent = ''; }, 1500); });
   $('#rawSend').addEventListener('click', () => {
     const v = $('#rawCmd').value.trim(); if (!v) return;
-    if (!link.connected) { toast('Not connected'); return; }
-    link.raw(v + '\n'); log('→ ' + v, 'tx');
+    try { if (!link.send(JSON.parse(v))) toast('Not connected'); } catch (e) { toast('Not valid JSON'); }
   });
 
   // keyboard
