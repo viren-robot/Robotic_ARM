@@ -121,7 +121,7 @@ main { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(380px, 1fr
   background: var(--scene-bg); border: 1px solid var(--border); box-shadow: var(--shadow); }
 .viewer canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 .side { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
-.tabs { display: flex; gap: 4px; overflow-x: auto; padding: 4px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); scrollbar-width: thin; }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); scrollbar-width: thin; }
 .tabs button { border: 0; background: transparent; color: var(--muted); font: inherit; font-weight: 600; padding: 7px 12px; border-radius: 8px; cursor: pointer; white-space: nowrap; }
 .tabs button:hover { color: var(--text); }
 .tabs button.on { background: var(--accent-weak); color: var(--accent); }
@@ -284,7 +284,7 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
       <button data-tab="safety">Safety</button>
       <button data-tab="asm">Assembly</button>
       <button data-tab="calib">Calibration</button>
-      <button data-tab="pins">Pin assignments</button>
+      <button data-tab="pins">Pins</button>
       <button data-tab="leds">NeoPixel</button>
       <button data-tab="settings">Settings</button>
     </nav>
