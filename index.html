@@ -222,12 +222,6 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
 .pinout text { font-family: var(--mono); font-size: 9.5px; fill: var(--muted); }
 .pinout .lbl { fill: var(--text); font-weight: 700; font-size: 10px; }
 
-/* ---------- LEDs ---------- */
-.strip { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px; border-radius: 10px; background: #0b0d10; justify-content: center; min-height: 46px; }
-.led { width: 18px; height: 18px; border-radius: 50%; background: #222; box-shadow: 0 0 0 1px #333 inset; }
-.swatches { display: flex; gap: 6px; flex-wrap: wrap; }
-.swatch { width: 26px; height: 26px; border-radius: 7px; border: 1px solid var(--border); cursor: pointer; }
-
 /* ---------- console ---------- */
 .console { font-family: var(--mono); font-size: 11.5px; height: 180px; overflow: auto; background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; padding: 8px; white-space: pre-wrap; word-break: break-all; }
 .console .tx { color: var(--blue); }
@@ -285,7 +279,6 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
       <button data-tab="asm">Assembly</button>
       <button data-tab="calib">Calibration</button>
       <button data-tab="pins">Pins</button>
-      <button data-tab="leds">NeoPixel</button>
       <button data-tab="settings">Settings</button>
     </nav>
 
@@ -568,49 +561,7 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
           <li>GP23, GP24, GP25 and GP29 are used by the Pico W's wireless chip and can't be assigned.</li>
           <li>GPn and GPn+16 share one PWM output (e.g. GP0 &amp; GP16), so two servos can't use both.</li>
           <li>Servo wires: <b>orange/yellow</b> = signal (to the GPIO above), <b>red</b> = +5 V (servo supply), <b>brown/black</b> = ground.</li>
-          <li>NeoPixels (optional) run on PIO, so any free GPIO works. Put a 330 Ω resistor in series with the data line.</li>
         </ul>
-      </div>
-    </div>
-
-    <!-- ================= NEOPIXEL ================= -->
-    <div class="panel" id="tab-leds">
-      <div class="card">
-        <div class="head"><h3>Preview</h3><label class="chk small"><input type="checkbox" data-bind="led.enabled"> Enabled</label></div>
-        <div class="strip" id="ledStrip"></div>
-      </div>
-      <div class="card">
-        <div class="head"><h3>Hardware</h3></div>
-        <div class="grid3">
-          <label class="field"><span>LED type</span><select data-bind="led.type" id="ledType"></select></label>
-          <label class="field"><span>Data pin</span><select data-bind="led.pin" data-num id="ledPin"></select></label>
-          <label class="field"><span>Number of LEDs</span><input type="number" min="1" max="300" data-bind="led.count"></label>
-          <label class="field"><span>Color order</span><select data-bind="led.order" id="ledOrder"></select></label>
-          <label class="field"><span>Channels</span><select data-bind="led.bpp" data-num id="ledBpp"><option value="3">RGB (3)</option><option value="4">RGBW (4)</option></select></label>
-          <label class="field"><span>Data rate</span><select data-bind="led.khz" data-num><option value="800">800 kHz</option><option value="400">400 kHz</option></select></label>
-        </div>
-        <p class="small muted" id="ledTypeInfo"></p>
-      </div>
-      <div class="card">
-        <div class="head"><h3>Color &amp; effect</h3></div>
-        <div class="grid2">
-          <label class="field"><span>Effect</span>
-            <select data-bind="led.mode">
-              <option value="status">Status (shows arm state)</option><option value="solid">Solid</option><option value="breathe">Breathe</option>
-              <option value="rainbow">Rainbow</option><option value="chase">Chase</option><option value="gradient">Gradient</option><option value="off">Off</option>
-            </select></label>
-          <div class="row" style="align-items:flex-end">
-            <label class="field"><span>Primary</span><input type="color" data-bind="led.color1"></label>
-            <label class="field"><span>Secondary</span><input type="color" data-bind="led.color2"></label>
-          </div>
-          <label class="field"><span>Brightness <b id="ledBriVal"></b></span><input type="range" min="0" max="255" data-bind="led.brightness"></label>
-          <label class="field"><span>Effect speed <b id="ledSpdVal"></b></span><input type="range" min="1" max="100" data-bind="led.speed"></label>
-          <label class="field" id="ledWField"><span>White channel <b id="ledWVal"></b></span><input type="range" min="0" max="255" data-bind="led.white"></label>
-        </div>
-        <h4>Quick colors</h4>
-        <div class="swatches" id="swatches"></div>
-        <p class="small muted" style="margin-top:10px">Status effect: amber pulse = waiting for a connection · primary color = connected · green = moving · red = E-stop.</p>
-        <div class="row end" style="margin-top:8px"><button class="btn sm primary" id="ledApply">Send to Pico</button></div>
       </div>
     </div>
 
@@ -643,7 +594,7 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
       </div>
       <div class="card">
         <div class="head"><h3>Pico firmware (MicroPython)</h3><span class="tag" id="fwTag"></span></div>
-        <p class="small muted">The Pico runs MicroPython plus the ArmCtl <code>main.py</code>. This page copies <code>main.py</code> onto the Pico by itself over USB — no Thonny needed. Your current pins, limits and LED settings are built into it. Works on a Raspberry Pi Pico or Pico W.</p>
+        <p class="small muted">The Pico runs MicroPython plus the ArmCtl <code>main.py</code>. This page copies <code>main.py</code> onto the Pico by itself over USB — no Thonny needed. Your current pins and limits are built into it. Works on a Raspberry Pi Pico or Pico W.</p>
         <ol class="small" style="margin:6px 0;padding-left:18px">
           <li><b>Once:</b> install MicroPython. Hold the Pico's <b>BOOTSEL</b> button while plugging it in; it shows up as a drive called RPI-RP2. Copy the MicroPython <code>.uf2</code> file onto it (from <a href="https://micropython.org/download/RPI_PICO/" target="_blank" rel="noopener">micropython.org</a>; for a Pico W use the RPI_PICO_W file). The Pico restarts by itself.</li>
           <li>Close Thonny if it's open (only one program can use the USB port).</li>
@@ -694,16 +645,16 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
 # Generated by the ArmCtl page. Save this file on the Pico as main.py.
 # The page talks to it over USB (Web Serial): one JSON message per line.
 # To get back to the MicroPython prompt (e.g. in Thonny), press Ctrl-C.
-import time, json, sys, math, machine, neopixel, select
+import time, json, sys, machine, select
 try:
     import asyncio
 except ImportError:
     import uasyncio as asyncio
 
-FW = "armctl-usb-1.1"
+FW = "armctl-usb-1.2"
 CFG_FILE = "arm_cfg.json"
 
-# Pins & LED setup from the web page. A config saved from the page (arm_cfg.json) overrides it.
+# Pins and limits from the web page. A config saved from the page (arm_cfg.json) overrides it.
 cfg = json.loads('''{{CFG}}''')
 try:
     with open(CFG_FILE) as f:
@@ -711,12 +662,9 @@ try:
 except Exception:
     pass
 
-st = {"estop": False, "moved": 0, "seen": 0, "lost": False}
-led = {"mode": "status", "c1": [0, 120, 255, 0], "c2": [255, 0, 120, 0], "bri": 80, "speed": 50}
-led.update(cfg.get("fx", {}))
+st = {"estop": False, "seen": 0, "lost": False}
 pwms = []
 pins_used = []
-np = None
 
 
 def save_cfg():
@@ -815,103 +763,6 @@ async def servo_task():
             out(i)
 
 
-# ---------------- NeoPixels ----------------
-def setup_led():
-    global np
-    if np:
-        try:
-            np.fill((0,) * np.bpp)
-            np.write()
-        except Exception:
-            pass
-    np = None
-    L = cfg.get("led")
-    if not L or L.get("count", 0) <= 0:
-        return
-    bpp = L.get("bpp", 3)
-    np = neopixel.NeoPixel(machine.Pin(L["pin"]), L["count"], bpp=bpp, timing=L.get("timing", 1))
-    order = L.get("order", "GRBW"[:bpp])
-    np.ORDER = tuple(order.index(c) for c in "RGBW"[:bpp])
-
-
-def wheel(p):
-    p = int(p) % 256
-    if p < 85:
-        return [255 - p * 3, p * 3, 0, 0]
-    if p < 170:
-        p -= 85
-        return [0, 255 - p * 3, p * 3, 0]
-    p -= 170
-    return [p * 3, 0, 255 - p * 3, 0]
-
-
-def render_led(t):
-    n = np.n
-    bpp = np.bpp
-    b = led["bri"] / 255
-    sp = max(1, led["speed"]) / 50
-    m = led["mode"]
-    c1 = (list(led["c1"]) + [0, 0, 0, 0])[:4]
-    c2 = (list(led["c2"]) + [0, 0, 0, 0])[:4]
-
-    def put(i, c, k=1.0):
-        np[i] = tuple(max(0, min(255, int(c[j] * b * k))) for j in range(bpp))
-
-    if m == "status":
-        now = time.ticks_ms()
-        if st["estop"]:
-            c, k = [255, 0, 0, 0], 1.0
-        elif st["lost"]:
-            c, k = [255, 140, 0, 0], 0.1 + 0.9 * (math.sin(t * 0.25) + 1) / 2
-        elif time.ticks_diff(now, st["moved"]) < 600:
-            c, k = [0, 255, 60, 0], 1.0
-        elif st["seen"] and time.ticks_diff(now, st["seen"]) < 4000:
-            c, k = c1, 0.45 + 0.55 * (math.sin(t * 0.05) + 1) / 2
-        else:
-            c, k = [255, 140, 0, 0], 0.1 + 0.9 * (math.sin(t * 0.12) + 1) / 2
-        for i in range(n):
-            put(i, c, k)
-    elif m == "solid":
-        for i in range(n):
-            put(i, c1)
-    elif m == "breathe":
-        k = 0.05 + 0.95 * (math.sin(t * 0.06 * sp) + 1) / 2
-        for i in range(n):
-            put(i, c1, k)
-    elif m == "rainbow":
-        for i in range(n):
-            put(i, wheel(i * 256 / n + t * 2 * sp))
-    elif m == "chase":
-        tail = max(1, n / 3)
-        head = int(t * 0.25 * sp) % n
-        for i in range(n):
-            d = (head - i) % n
-            if d < tail:
-                put(i, c1, 1 - d / tail)
-            else:
-                put(i, c2, 0.15)
-    elif m == "gradient":
-        for i in range(n):
-            k = (i / n + t * 0.004 * sp) % 1
-            k = 1 - abs(2 * k - 1)
-            put(i, [c1[j] + (c2[j] - c1[j]) * k for j in range(4)])
-    else:
-        np.fill((0,) * bpp)
-    np.write()
-
-
-async def led_task():
-    t = 0
-    while True:
-        if np:
-            try:
-                render_led(t)
-            except Exception as e:
-                print("led error", e)
-        t += 1
-        await asyncio.sleep_ms(33)
-
-
 # ---------------- protocol ----------------
 def handle(line):
     try:
@@ -924,7 +775,6 @@ def handle(line):
         st["lost"] = False
         if not st["estop"]:        # ignored until the page resets the E-STOP
             set_targets(m.get("us", []))
-            st["moved"] = st["seen"]
     elif t == "stop":              # E-STOP: freeze in place, or go limp
         st["estop"] = True
         if m.get("mode") == "release":
@@ -941,23 +791,15 @@ def handle(line):
     elif t == "cfg":
         if "servos" in m:
             cfg["servos"] = m["servos"]
-        if "led" in m:
-            cfg["led"] = m["led"]
         if "timeout" in m:
             cfg["timeout"] = m["timeout"]
         setup_servos()
-        setup_led()
         saved = save_cfg() if m.get("save") else False
         return {"t": "ack", "what": "cfg", "saved": saved}
-    elif t == "led":
-        led.update(m.get("fx", {}))
-        if m.get("save"):
-            cfg["fx"] = dict(led)
-            save_cfg()
     elif t == "ping":
         return {"t": "pong", "id": m.get("id")}
     elif t == "hello":
-        return {"t": "hello", "fw": FW, "servos": len(pwms), "led": cfg.get("led")}
+        return {"t": "hello", "fw": FW, "servos": len(pwms)}
     return None
 
 
@@ -982,8 +824,6 @@ async def serial_task():
 
 async def main():
     setup_servos()
-    setup_led()
-    asyncio.create_task(led_task())
     asyncio.create_task(servo_task())
     print(json.dumps({"t": "log", "msg": "ArmCtl ready on USB"}))
     await serial_task()
@@ -1018,19 +858,6 @@ const SERVOS = [
   { id: 'gripper',  name: 'Gripper',  joint: 'gripper',  type: 'MG90S' },
 ];
 const PICO_PINS = [...Array(23).keys(), 26, 27, 28];
-const LED_TYPES = {
-  'WS2812B':     { order: 'GRB',  bpp: 3, khz: 800, info: '5 V, the most common NeoPixel.' },
-  'WS2812':      { order: 'GRB',  bpp: 3, khz: 800, info: '5 V, older 6-pin version of the WS2812B.' },
-  'WS2813':      { order: 'GRB',  bpp: 3, khz: 800, info: '5 V, with backup data line.' },
-  'WS2815':      { order: 'GRB',  bpp: 3, khz: 800, info: '12 V strip — needs a separate 12 V supply and a level shifter is recommended.' },
-  'WS2811':      { order: 'RGB',  bpp: 3, khz: 800, info: '12 V pixel driver IC; some older strips need 400 kHz.' },
-  'SK6812':      { order: 'GRB',  bpp: 3, khz: 800, info: '5 V, WS2812B-compatible.' },
-  'SK6812 RGBW': { order: 'GRBW', bpp: 4, khz: 800, info: '5 V, with an extra white LED (4 channels).' },
-  'APA106':      { order: 'RGB',  bpp: 3, khz: 800, info: 'Through-hole 5 mm / 8 mm addressable LED.' },
-  'PL9823':      { order: 'RGB',  bpp: 3, khz: 800, info: 'Through-hole addressable LED (APA106 clone).' },
-  'Custom':      { order: null,   bpp: null, khz: null, info: 'Set the color order, channels and data rate manually.' },
-};
-
 // Built-in examples. Pick & place uses straight-line (IK) moves to go down to and up from the table.
 const DEMO_ANIMS = (() => {
   const k = (t, base, shoulder, elbow, gripper, move = 'joint', ease = 'smooth') => ({ t, q: { base, shoulder, elbow, gripper }, move, ease });
@@ -1046,7 +873,7 @@ const DEMO_ANIMS = (() => {
 })();
 const servoDefaults = (pin, type, extra = {}) => ({ pin, type, center: 90, invert: false, minAngle: 0, maxAngle: 180, minUs: 500, maxUs: 2500, range: 180, ...extra });
 const DEFAULT_CFG = {
-  version: 6,
+  version: 7,
   theme: 'auto',
   mode: 'sim',
   speed: 50,
@@ -1063,8 +890,6 @@ const DEFAULT_CFG = {
     gripper:  servoDefaults(6, 'MG90S', { closedAngle: 40, openAngle: 130 }),
   },
   typeSpeed: { MG90S: 400 },
-  led: { enabled: true, type: 'WS2812B', pin: 15, count: 8, order: 'GRB', bpp: 3, khz: 800,
-         mode: 'status', color1: '#0078ff', color2: '#ff0078', white: 0, brightness: 80, speed: 50 },
   conn: { rate: 30, autoReconnect: true, port: '' },   // port: 'VID:PID#n' of the chosen USB port
   view: { grid: true, envelope: true, axes: false, shadows: true, ikMarker: true, trail: false, animPath: true },
   sim: { realistic: true, ghost: false, tolerance: 12, poseTol: 8 },
@@ -1096,13 +921,12 @@ function loadCfg(saved) {
     const sv = saved.servos || {}, old = { base: 0, shoulder: 1, elbow: 2, gripper: 3 };
     if (Object.entries(old).every(([k, pin]) => sv[k]?.pin === undefined || +sv[k].pin === pin))
       for (const k of Object.keys(old)) if (sv[k]) sv[k].pin = DEFAULT_CFG.servos[k].pin;
-    if (saved.led && +saved.led.pin === 16) saved.led.pin = DEFAULT_CFG.led.pin;
   }
   if (v === 5) {                                 // v5 was the Arduino Uno version: its D-pin numbers mean nothing on a Pico
     for (const k of Object.keys(DEFAULT_CFG.servos)) if (saved.servos?.[k]) saved.servos[k].pin = DEFAULT_CFG.servos[k].pin;
-    if (saved.led) saved.led.pin = DEFAULT_CFG.led.pin;
     if (saved.conn) saved.conn.port = '';
   }
+  if (v < 7) delete saved.led;                   // v7: NeoPixel support removed
   delete saved.version;
   return merge(DEFAULT_CFG, saved);
 }
@@ -1358,7 +1182,6 @@ const link = {
     this.raw('\r\n');
     this.send({ t: 'hello' });
     this.send(cfgPacket(false));
-    this.send(ledPacket(false));
     updateConn(); renderPorts();
   },
   async close(byUser = true) {
@@ -1462,7 +1285,6 @@ async function addPort() {
 }
 const live = () => cfg.mode === 'live';
 function cfgPacket(save) {
-  const L = cfg.led;
   return {
     t: 'cfg', save: !!save,
     // Pico-side safety: pulse range from the calibrated min/max angle, speed limit in µs per second
@@ -1471,13 +1293,7 @@ function cfgPacket(save) {
       return { id: s.id, pin: +c.pin, freq: 50, min: Math.min(...a), max: Math.max(...a), slew: Math.round(+cfg.safety.fwSlew * Math.abs(c.maxUs - c.minUs) / c.range) };
     }),
     timeout: Math.round(+cfg.safety.timeout * 1000),
-    led: { pin: +L.pin, count: L.enabled ? +L.count : 0, bpp: +L.bpp, timing: +L.khz === 800 ? 1 : 0, order: L.order, type: L.type },
   };
-}
-const hexRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) || 0);
-function ledPacket(save) {
-  const L = cfg.led;
-  return { t: 'led', save: !!save, fx: { mode: L.enabled ? L.mode : 'off', c1: [...hexRgb(L.color1), +L.white], c2: [...hexRgb(L.color2), +L.white], bri: +L.brightness, speed: +L.speed } };
 }
 function updateConn() {
   const dot = $('#connDot'), txt = $('#connText'), btn = $('#connBtn');
@@ -2172,7 +1988,6 @@ const pwmOf = p => `${(p >> 1) & 7}${p & 1 ? 'B' : 'A'}`;
 function pinProblems() {
   const msgs = [], bad = new Set();
   const uses = SERVOS.map(s => ({ who: s.name, pin: +cfg.servos[s.id].pin, pwm: true }));
-  if (cfg.led.enabled) uses.push({ who: 'NeoPixel', pin: +cfg.led.pin, pwm: false });
   for (let i = 0; i < uses.length; i++) for (let k = i + 1; k < uses.length; k++) {
     const a = uses[i], b = uses[k];
     if (a.pin === b.pin) { msgs.push(['err', `${a.who} and ${b.who} are both on GP${a.pin}.`]); bad.add(a.who); bad.add(b.who); }
@@ -2187,12 +2002,9 @@ function buildPins() {
   t.innerHTML = '<tr><th>Output</th><th>Type</th><th>GPIO</th><th>PWM</th><th>Wire</th><th></th></tr>' +
     SERVOS.map(s => `<tr data-who="${esc(s.name)}"><td><b>${s.name} servo</b></td><td><span class="tag">${s.type}</span></td>
       <td><select data-bind="servos.${s.id}.pin" data-num>${pinOptions(cfg.servos[s.id].pin)}</select></td><td class="mono small" data-pwm></td>
-      <td class="small muted">Signal wire (orange or yellow)</td><td data-st></td></tr>`).join('') +
-    `<tr data-who="NeoPixel"><td><b>NeoPixel data</b> <span class="small muted">(optional)</span></td><td><span class="tag" id="pinLedType"></span></td>
-      <td><select data-bind="led.pin" data-num>${pinOptions(cfg.led.pin)}</select></td><td class="mono small">PIO</td>
-      <td class="small muted">Data in, with a 330 Ω resistor in series</td><td data-st></td></tr>`;
+      <td class="small muted">Signal wire (orange or yellow)</td><td data-st></td></tr>`).join('');
+
   bindAll(t);
-  $('#ledPin').innerHTML = pinOptions(cfg.led.pin);
   refreshPins();
 }
 function refreshPins() {
@@ -2201,9 +2013,8 @@ function refreshPins() {
     const who = tr.dataset.who, sv = SERVOS.find(s => s.name === who);
     if (sv) $('[data-pwm]', tr).textContent = pwmOf(+cfg.servos[sv.id].pin);
     $('[data-st]', tr).innerHTML = bad.has(who) ? '<span class="tag err">conflict</span>' : '<span class="tag ok">ok</span>';
-    const sel = $('select', tr); const want = sv ? cfg.servos[sv.id].pin : cfg.led.pin; if (+sel.value !== +want) sel.value = want;
+    const sel = $('select', tr); const want = cfg.servos[sv.id].pin; if (+sel.value !== +want) sel.value = want;
   }
-  $('#pinLedType').textContent = cfg.led.type;
   $('#pinMsgs').innerHTML = msgs.map(([c, m]) => `<div class="note ${c}">${esc(m)}</div>`).join('');
   const st = $('#pinState'); st.textContent = msgs.length ? `${msgs.length} problem${msgs.length > 1 ? 's' : ''}` : 'valid'; st.className = 'tag ' + (msgs.length ? 'err' : 'ok');
   $('#pinApply').disabled = msgs.length > 0;
@@ -2215,7 +2026,6 @@ function drawPinout() {
   const right = ['VBUS', 'VSYS', 'GND', '3V3_EN', '3V3', 'ADC_VREF', 'GP28', 'AGND', 'GP27', 'GP26', 'RUN', 'GP22', 'GND', 'GP21', 'GP20', 'GP19', 'GP18', 'GND', 'GP17', 'GP16'];
   const assigned = {};
   for (const s of SERVOS) (assigned['GP' + cfg.servos[s.id].pin] ||= []).push(s.name);
-  if (cfg.led.enabled) (assigned['GP' + cfg.led.pin] ||= []).push('NeoPixel');
   const bx = 200, bw = 120, top = 26, dy = 14.4;
   let s = `<rect x="${bx}" y="8" width="${bw}" height="${top + dy * 20}" rx="8" fill="#1f7a3a" stroke="#14532a"/>
     <rect x="${bx + bw / 2 - 16}" y="0" width="32" height="18" rx="3" fill="#b8bec6" stroke="#8a9199"/>
@@ -2235,71 +2045,6 @@ function drawPinout() {
   left.forEach((n, i) => pin(bx + 8, top + i * dy + 8, n, i + 1, 'L'));
   right.forEach((n, i) => pin(bx + bw - 8, top + i * dy + 8, n, 40 - i, 'R'));
   $('#pinout').innerHTML = s;
-}
-
-/* =====================================================================
-   NeoPixel UI
-   ===================================================================== */
-const ORDERS3 = ['RGB', 'RBG', 'GRB', 'GBR', 'BRG', 'BGR'];
-function ledOrderOptions() {
-  const list = +cfg.led.bpp === 4 ? [...ORDERS3.map(o => o + 'W'), 'WRGB', 'WGRB'] : ORDERS3;
-  if (!list.includes(cfg.led.order)) cfg.led.order = +cfg.led.bpp === 4 ? 'GRBW' : 'GRB';
-  $('#ledOrder').innerHTML = list.map(o => `<option${o === cfg.led.order ? ' selected' : ''}>${o}</option>`).join('');
-}
-function buildLeds() {
-  $('#ledType').innerHTML = Object.keys(LED_TYPES).map(k => `<option>${k}</option>`).join('');
-  $('#swatches').innerHTML = ['#ff0000', '#ff7a00', '#ffd400', '#00ff40', '#00e5ff', '#0078ff', '#7a00ff', '#ff00a8', '#ffffff'].map(c => `<button class="swatch" style="background:${c}" data-c="${c}" title="${c}"></button>`).join('');
-  $$('#swatches .swatch').forEach(b => b.addEventListener('click', () => { cfg.led.color1 = b.dataset.c; if (cfg.led.mode === 'off' || cfg.led.mode === 'rainbow') cfg.led.mode = 'solid'; saveCfg(); bindAll($('#tab-leds')); ledChanged(); }));
-  ledOrderOptions();
-  ledChanged(true);
-}
-function ledChanged(silent) {
-  const L = cfg.led;
-  $('#ledTypeInfo').textContent = LED_TYPES[L.type]?.info || '';
-  $('#ledBriVal').textContent = Math.round(L.brightness / 2.55) + ' %';
-  $('#ledSpdVal').textContent = L.speed;
-  $('#ledWVal').textContent = L.white;
-  $('#ledWField').style.display = +L.bpp === 4 ? '' : 'none';
-  const strip = $('#ledStrip');
-  const n = clamp(+L.count || 0, 0, 300);
-  if (strip.childElementCount !== n) strip.innerHTML = '<span class="led"></span>'.repeat(n);
-  if (!silent) liveLedSend();
-}
-let ledSendT = 0;
-function liveLedSend() {
-  clearTimeout(ledSendT);
-  ledSendT = setTimeout(() => { if (link.connected) link.send(ledPacket(false)); }, 150);
-}
-// Browser preview of the firmware's LED effects (same maths as render_led in main.py)
-function wheel(p) { p = Math.floor(p) % 256; if (p < 0) p += 256; if (p < 85) return [255 - p * 3, p * 3, 0]; if (p < 170) { p -= 85; return [0, 255 - p * 3, p * 3]; } p -= 170; return [p * 3, 0, 255 - p * 3]; }
-let ledT = 0, ledLast = 0;
-function renderLedPreview(now) {
-  if (!$('#tab-leds').classList.contains('on')) return;
-  if (now - ledLast < 33) return; ledLast = now; ledT++;
-  const L = cfg.led, leds = $('#ledStrip').children, n = leds.length; if (!n) return;
-  const b = L.brightness / 255, sp = Math.max(1, L.speed) / 50, t = ledT;
-  const c1 = hexRgb(L.color1), c2 = hexRgb(L.color2), w = +L.bpp === 4 ? +L.white : 0;
-  const mode = L.enabled ? L.mode : 'off';
-  for (let i = 0; i < n; i++) {
-    let c = [0, 0, 0], k = 1;
-    if (mode === 'status') {
-      if (state.estop) c = [255, 0, 0];
-      else if (JOINTS.some(j => Math.abs(state.current[j.id] - state.target[j.id]) > 0.5) && live()) c = [0, 255, 60];
-      else if (link.connected) { c = c1; k = 0.45 + 0.55 * (Math.sin(t * 0.05) + 1) / 2; }
-      else { c = [255, 140, 0]; k = 0.1 + 0.9 * (Math.sin(t * 0.12) + 1) / 2; }
-    } else if (mode === 'solid') c = c1;
-    else if (mode === 'breathe') { c = c1; k = 0.05 + 0.95 * (Math.sin(t * 0.06 * sp) + 1) / 2; }
-    else if (mode === 'rainbow') c = wheel(i * 256 / n + t * 2 * sp);
-    else if (mode === 'chase') { const tail = Math.max(1, n / 3), head = Math.floor(t * 0.25 * sp) % n, d = ((head - i) % n + n) % n; if (d < tail) { c = c1; k = 1 - d / tail; } else { c = c2; k = 0.15; } }
-    else if (mode === 'gradient') { let kk = (i / n + t * 0.004 * sp) % 1; kk = 1 - Math.abs(2 * kk - 1); c = c1.map((v, j) => v + (c2[j] - v) * kk); }
-    else k = 0;
-    const f = b * k, wv = w * f;
-    // Show white channel additively; boost dim values a bit so the preview stays readable
-    const rgb = c.map(v => Math.min(255, Math.round(v * f + wv)));
-    const lum = Math.max(...rgb);
-    leds[i].style.background = lum < 3 ? '#1b1d21' : `rgb(${rgb.join(',')})`;
-    leds[i].style.boxShadow = lum < 3 ? '0 0 0 1px #333 inset' : `0 0 ${4 + lum / 18}px rgb(${rgb.join(',')})`;
-  }
 }
 
 /* =====================================================================
@@ -2331,17 +2076,6 @@ function onBind(p, el) {
     buildJointRows(); syncIkFromTarget();
   }
   if (p.startsWith('servos.')) { if (p.endsWith('.pin')) refreshPins(); refreshCalInfo(); link.lastSent = ''; }
-  if (p.startsWith('led.')) {
-    if (p === 'led.type') {
-      const T = LED_TYPES[cfg.led.type];
-      if (T.order) Object.assign(cfg.led, { order: T.order, bpp: T.bpp, khz: T.khz });
-      ledOrderOptions(); bindAll($('#tab-leds'));
-    }
-    if (p === 'led.bpp') ledOrderOptions();
-    if (p === 'led.pin' || p === 'led.enabled') refreshPins();
-    if (p === 'led.pin') bindAll($('#tab-pins')), bindAll($('#tab-leds'));
-    ledChanged();
-  }
   if (p.startsWith('view.')) { applyView(); updateAnimPath(); }
   if (p.startsWith('sim.')) { if (p === 'sim.tolerance') updateTargets(); }
   if (p.startsWith('safety.')) { ikRanges(); renderAnimUI(); renderSafety(); sendCfgSoon(); }
@@ -2931,7 +2665,6 @@ function tick(now) {
   render3D(now);
   updateReadout(now);
   updateHud(now);
-  renderLedPreview(now);
   if (now - tlLast > 33 && $('#tab-anim').classList.contains('on')) { tlLast = now; drawTimeline(); if (anim.playing || anim.rec) renderTransport(); }
   requestAnimationFrame(tick);
 }
@@ -2944,8 +2677,8 @@ function download(name, text, type = 'text/plain') {
   document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
 }
 function firmware() {
-  const pk = cfgPacket(false), lp = ledPacket(false);
-  const fwCfg = { servos: pk.servos, led: pk.led, fx: lp.fx, timeout: pk.timeout };
+  const pk = cfgPacket(false);
+  const fwCfg = { servos: pk.servos, timeout: pk.timeout };
   if (pinProblems().msgs.length) { toast('Fix the pin conflicts first'); return null; }
   return $('#fwTemplate').textContent.replace(/^\n/, '')
     .replace('{{CFG}}', () => JSON.stringify(fwCfg).replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
@@ -3132,12 +2865,7 @@ function setupEvents() {
   });
   $('#pinDefaults').addEventListener('click', () => {
     for (const s of SERVOS) cfg.servos[s.id].pin = DEFAULT_CFG.servos[s.id].pin;
-    cfg.led.pin = DEFAULT_CFG.led.pin; saveCfg(); bindAll(); refreshPins();
-  });
-  // leds
-  $('#ledApply').addEventListener('click', () => {
-    if (!link.connected) { toast('Connect to the Pico first'); return; }
-    link.send(cfgPacket(true)); link.send(ledPacket(true)); toast('LED settings sent and saved on the Pico');
+    saveCfg(); bindAll(); refreshPins();
   });
   // settings
   $('#fwFlash').addEventListener('click', uploadFirmware);
@@ -3156,7 +2884,7 @@ function setupEvents() {
     clearTimeout(saveTimer); location.reload();
   });
   $('#logClear').addEventListener('click', () => $('#console').innerHTML = '');
-  $('#picoReset').addEventListener('click', () => { if (!link.connected) { toast('Not connected'); return; } link.raw('\x03\x03\x04'); log('Restarting main.py on the Pico…'); setTimeout(() => { link.send({ t: 'hello' }); link.send(cfgPacket(false)); link.send(ledPacket(false)); link.lastSent = ''; }, 1500); });
+  $('#picoReset').addEventListener('click', () => { if (!link.connected) { toast('Not connected'); return; } link.raw('\x03\x03\x04'); log('Restarting main.py on the Pico…'); setTimeout(() => { link.send({ t: 'hello' }); link.send(cfgPacket(false)); link.lastSent = ''; }, 1500); });
   $('#rawSend').addEventListener('click', () => {
     const v = $('#rawCmd').value.trim(); if (!v) return;
     try { if (!link.send(JSON.parse(v))) toast('Not connected'); } catch (e) { toast('Not valid JSON'); }
@@ -3191,7 +2919,6 @@ function boot() {
   setupIk();
   buildCalibration();
   buildPins();
-  buildLeds();
   bindAll();
   $('#speedVal').textContent = cfg.speed + ' %';
   applyTheme();

@@ -10,7 +10,6 @@ The arm is the "Robotic arm - brazo robótico" frame (8 printed parts): base, ar
 | Shoulder servo (MG90S, −45…85°) | GP2 | Signal wire |
 | Elbow servo (MG90S, −60…90°) | GP4 | Signal wire |
 | Gripper servo (MG90S, 0…100 %, ~21 mm jaw travel) | GP6 | Signal wire |
-| NeoPixel data (optional) | GP15 | Add a 330 Ω resistor in series with the data line |
 
 Pins and limits can be changed in the page.
 
@@ -41,7 +40,7 @@ Pins and limits can be changed in the page.
     - A speed limit applies even if the page sends a jump.
     - The Pico holds position if commands stop (USB unplugged, page closed).
     - **E-STOP** freezes the arm in place (or optionally releases the servos).
-- **Calibration** of servo centres, directions, limits and home pose. **Pin assignments** with a pinout diagram. **NeoPixel** LED control.
+- **Calibration** of servo centres, directions, limits and home pose. **Pin assignments** with a pinout diagram.
 - **Assembly guide** (Assembly tab): 11 steps in the 3D view. The parts for each step slide into place in blue, the camera follows, and the last step plays a test movement. Includes a button that moves the servos to the assembly position before you fit the horns.
 - **main.py upload from the page**: one click copies the firmware onto the Pico over USB, no Thonny needed.
 - **E-STOP** button (or press `Esc`). Light and dark themes. Works on phones (simulator only: phones have no Web Serial).
@@ -77,7 +76,6 @@ Arm dimensions, measured between the servo shafts in the STL files: shoulder axi
 - **Servo signal wires** (orange or yellow): GP0 base, GP2 shoulder, GP4 elbow, GP6 gripper.
 - **Servo power:** red wires to +5 V and brown/black wires to ground, from a separate 5 V supply (≥ 3 A), not from the Pico or USB.
 - **Common ground:** connect the supply's ground to a Pico GND pin.
-- **NeoPixel (optional):** data line to GP15 through a 330 Ω resistor.
 
 ## USB protocol
 
@@ -85,4 +83,4 @@ One JSON object per line:
 
 - `{"t":"pos","us":[…4 pulse widths…]}` sets the four servo pulse widths.
 - `{"t":"off"}` releases the servos.
-- `cfg`, `led`, `ping` and `hello` handle setup and the keep-alive.
+- `cfg`, `ping` and `hello` handle setup and the keep-alive.
