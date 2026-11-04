@@ -41,6 +41,7 @@ Pins and limits can be changed in the page.
     - The Pico holds position if commands stop (USB unplugged, page closed).
     - **E-STOP** freezes the arm in place (or optionally releases the servos).
 - **Calibration** of servo centres, directions, limits and home pose. **Pin assignments** with a pinout diagram.
+- **Test tab**: checks the USB connection, the main.py version and the mode, then checks each servo. A signal wire check shows whether something is attached to its pin, and a **Wiggle** button moves the servo a few degrees so you can confirm it really moves. Includes troubleshooting tips.
 - **Assembly guide** (Assembly tab): 11 steps in the 3D view. The parts for each step slide into place in blue, the camera follows, and the last step plays a test movement. Includes a button that moves the servos to the assembly position before you fit the horns.
 - **main.py upload from the page**: one click copies the firmware onto the Pico over USB, no Thonny needed.
 - **E-STOP** button (or press `Esc`). Light and dark themes. Works on phones (simulator only: phones have no Web Serial).
