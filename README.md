@@ -1,6 +1,6 @@
 # ArmCtl — Robotic Arm Control Website
 
-A single-file web app (`index.html`) to control a 4-axis 3D-printed robotic arm driven by **4× MG90S** servos and a Raspberry Pi Pico (or Pico W) **over USB**.
+A single-file web app (`index.html`) to control a 4-axis 3D-printed robotic arm driven by **4× MG90S** servos and a **Raspberry Pi Pico H** **over USB**.
 
 The arm is the "Robotic arm - brazo robótico" frame (8 printed parts): base, arm base, upper arm, forearm, gripper adapter, gripper base, gripper rack and gear.
 
@@ -50,7 +50,7 @@ Arm dimensions, measured between the servo shafts in the STL files: shoulder axi
 ## Quick start
 
 1. Open `index.html` in **Chrome or Edge** on a computer. It starts in **Simulator** mode. Try the Animate tab.
-2. Install MicroPython on the Pico (once): hold BOOTSEL while plugging it in, then copy the MicroPython `.uf2` ([micropython.org](https://micropython.org/download/RPI_PICO/), or RPI_PICO_W for a Pico W) onto the RPI-RP2 drive.
+2. Install MicroPython on the Pico (once): hold BOOTSEL while plugging it in, then copy the MicroPython `.uf2` ([micropython.org](https://micropython.org/download/RPI_PICO/) — the RPI_PICO file) onto the RPI-RP2 drive.
 3. In the page, go to **Settings → Pico firmware** and click **Upload to Pico**. The page copies `main.py` onto the Pico over USB (no Thonny needed), checks it, starts it and connects. Close Thonny first if it's open. To copy it by hand instead, use "Copy main.py yourself instead" in the same card.
 4. Switch to **Live**. Next time, just click **Connect USB**.
 5. Building the arm? Follow the **Assembly** tab step by step.

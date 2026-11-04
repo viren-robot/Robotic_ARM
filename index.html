@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>ArmCtl — Pico W Robotic Arm</title>
+<title>ArmCtl — Pico H Robotic Arm</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23f26b1d'/%3E%3Cpath d='M16 50h20M26 50V34l12-14 10 6' stroke='white' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <script>
   // Apply saved theme before first paint (avoids a flash of the wrong theme)
@@ -237,7 +237,7 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
 <header>
   <div class="brand">
     <div class="logo"><svg width="20" height="20" viewBox="0 0 64 64"><path d="M10 54h26M22 54V34l14-16 14 8" stroke="#fff" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-    <div><h1>ArmCtl</h1><span>4-axis arm · 4× MG90S · Raspberry Pi Pico W</span></div>
+    <div><h1>ArmCtl</h1><span>4-axis arm · 4× MG90S · Raspberry Pi Pico H</span></div>
   </div>
   <div class="seg" id="modeSeg" title="Simulator mode never sends anything to the arm">
     <button data-mode="sim">Simulator</button>
@@ -550,7 +550,7 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
         </div>
       </div>
       <div class="card">
-        <div class="head"><h3>Pico W pinout</h3><span class="small muted">top view, USB at the top</span></div>
+        <div class="head"><h3>Pico H pinout</h3><span class="small muted">top view, USB at the top</span></div>
         <svg class="pinout" id="pinout" viewBox="0 0 520 330"></svg>
       </div>
       <div class="card small">
@@ -558,7 +558,7 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
         <ul style="margin:0;padding-left:18px">
           <li>Power the four MG90S from a separate 5 V supply (≥ 3 A; each can draw ~0.7 A when stalled). Never from the Pico's 3V3 pin, and not from USB.</li>
           <li>Connect the servo supply ground to a Pico <b>GND</b> pin — the signal needs a common ground.</li>
-          <li>GP23, GP24, GP25 and GP29 are used by the Pico W's wireless chip and can't be assigned.</li>
+          <li>GP23, GP24, GP25 and GP29 aren't on the Pico H's pins: the board uses them inside (power supply, USB sense, the green LED and the VSYS reading).</li>
           <li>GPn and GPn+16 share one PWM output (e.g. GP0 &amp; GP16), so two servos can't use both.</li>
           <li>Servo wires: <b>orange/yellow</b> = signal (to the GPIO above), <b>red</b> = +5 V (servo supply), <b>brown/black</b> = ground.</li>
         </ul>
@@ -594,9 +594,9 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
       </div>
       <div class="card">
         <div class="head"><h3>Pico firmware (MicroPython)</h3><span class="tag" id="fwTag"></span></div>
-        <p class="small muted">The Pico runs MicroPython plus the ArmCtl <code>main.py</code>. This page copies <code>main.py</code> onto the Pico by itself over USB — no Thonny needed. Your current pins and limits are built into it. Works on a Raspberry Pi Pico or Pico W.</p>
+        <p class="small muted">The Pico runs MicroPython plus the ArmCtl <code>main.py</code>. This page copies <code>main.py</code> onto the Pico by itself over USB — no Thonny needed. Your current pins and limits are built into it. Made for the Raspberry Pi Pico H (a plain Pico works the same way).</p>
         <ol class="small" style="margin:6px 0;padding-left:18px">
-          <li><b>Once:</b> install MicroPython. Hold the Pico's <b>BOOTSEL</b> button while plugging it in; it shows up as a drive called RPI-RP2. Copy the MicroPython <code>.uf2</code> file onto it (from <a href="https://micropython.org/download/RPI_PICO/" target="_blank" rel="noopener">micropython.org</a>; for a Pico W use the RPI_PICO_W file). The Pico restarts by itself.</li>
+          <li><b>Once:</b> install MicroPython. Hold the Pico's <b>BOOTSEL</b> button while plugging it in; it shows up as a drive called RPI-RP2. Copy the MicroPython <code>.uf2</code> file onto it (from <a href="https://micropython.org/download/RPI_PICO/" target="_blank" rel="noopener">micropython.org</a>; pick the <b>RPI_PICO</b> file, not RPI_PICO_W). The Pico restarts by itself.</li>
           <li>Close Thonny if it's open (only one program can use the USB port).</li>
           <li>Click <b>Upload to Pico</b> and pick the Pico's port if asked. It takes a few seconds, then the page connects.</li>
         </ol>
@@ -641,7 +641,7 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
 
 <!-- MicroPython firmware template (filled in by "Download main.py") -->
 <script type="text/plain" id="fwTemplate">
-# ArmCtl firmware for Raspberry Pi Pico / Pico W (MicroPython 1.20 or newer)
+# ArmCtl firmware for Raspberry Pi Pico H (MicroPython 1.20 or newer)
 # Generated by the ArmCtl page. Save this file on the Pico as main.py.
 # The page talks to it over USB (Web Serial): one JSON message per line.
 # To get back to the MicroPython prompt (e.g. in Thonny), press Ctrl-C.
@@ -834,7 +834,7 @@ asyncio.run(main())
 
 <script type="module">
 /* =====================================================================
-   ArmCtl — control page for a 4-axis robotic arm (4× MG90S) on a Raspberry Pi Pico W
+   ArmCtl — control page for a 4-axis robotic arm (4× MG90S) on a Raspberry Pi Pico H
    ===================================================================== */
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -1993,7 +1993,7 @@ function pinProblems() {
     if (a.pin === b.pin) { msgs.push(['err', `${a.who} and ${b.who} are both on GP${a.pin}.`]); bad.add(a.who); bad.add(b.who); }
     else if (a.pwm && b.pwm && pwmOf(a.pin) === pwmOf(b.pin)) { msgs.push(['err', `${a.who} (GP${a.pin}) and ${b.who} (GP${b.pin}) share PWM channel ${pwmOf(a.pin)} — they would always output the same pulse.`]); bad.add(a.who); bad.add(b.who); }
   }
-  for (const u of uses) if (!PICO_PINS.includes(u.pin)) { msgs.push(['err', `${u.who}: GP${u.pin} is not available on the Pico W.`]); bad.add(u.who); }
+  for (const u of uses) if (!PICO_PINS.includes(u.pin)) { msgs.push(['err', `${u.who}: GP${u.pin} is not available on the Pico H.`]); bad.add(u.who); }
   return { msgs, bad };
 }
 function pinOptions(sel) { return PICO_PINS.map(p => `<option value="${p}"${+sel === p ? ' selected' : ''}>GP${p}</option>`).join(''); }
@@ -2031,8 +2031,10 @@ function drawPinout() {
     <rect x="${bx + bw / 2 - 16}" y="0" width="32" height="18" rx="3" fill="#b8bec6" stroke="#8a9199"/>
     <rect x="${bx + 35}" y="${top + 60}" width="50" height="50" rx="3" fill="#202326"/>
     <text x="${bx + bw / 2}" y="${top + 128}" text-anchor="middle" style="fill:#cfe8d6;font-size:9px">RP2040</text>
-    <rect x="${bx + 30}" y="${top + 190}" width="60" height="44" rx="3" fill="#c3c8ce" stroke="#9aa1a8"/>
-    <text x="${bx + bw / 2}" y="${top + 216}" text-anchor="middle" style="fill:#333;font-size:9px">CYW43439</text>`;
+    <circle cx="${bx + bw / 2}" cy="${top + 30}" r="7" fill="#f2f2ee" stroke="#9aa1a8"/>
+    <text x="${bx + bw / 2}" y="${top + 48}" text-anchor="middle" style="fill:#cfe8d6;font-size:8px">BOOTSEL</text>
+    <rect x="${bx + bw / 2 - 14}" y="${top + dy * 20 - 14}" width="28" height="12" rx="2" fill="#e8e3d3" stroke="#9aa1a8"/>
+    <text x="${bx + bw / 2}" y="${top + dy * 20 - 18}" text-anchor="middle" style="fill:#cfe8d6;font-size:8px">DEBUG</text>`;
   const pin = (x, y, name, num, side) => {
     const a = assigned[name], power = /GND|V|3V3|RUN|ADC/.test(name);
     const fill = a ? (a.length > 1 ? 'var(--danger)' : 'var(--accent)') : power ? (name.includes('GND') ? '#333' : '#c0392b') : '#d4b25c';
