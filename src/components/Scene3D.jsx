@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { app, poseNow, simSensors, simTrack, isSim } from '../lib/controller.js';
+import { app, poseNow, simSensors, simTrack, isSim, goTo } from '../lib/controller.js';
 import { vmaxOf } from '../lib/kinematics.js';
 import { ikGeometry } from '../lib/ik.js';
 
@@ -92,9 +92,11 @@ export default function Scene3D({ theme }) {
     // inverse kinematics on the car: one arrow per wheel (length = speed), the turning centre and the spoke to it
     const wheelArrows = [0, 1].map(() => { const a = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1.8, 0), 0.5, 0xf26b1d, 0.3, 0.2); a.renderOrder = 10; a.traverse(o => { if (o.material) { o.material.depthTest = false; o.material.transparent = true; } }); car.add(a); return a; });
     const icc = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 12), new THREE.MeshBasicMaterial({ color: 0x35e070, depthTest: false })); icc.renderOrder = 10; icc.visible = false; scene.add(icc);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.28, 0.4, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x35e070, transparent: true, opacity: 0.9, depthTest: false }));
+    ring.renderOrder = 10; ring.visible = false; scene.add(ring);
     const spokeGeo = new THREE.BufferGeometry();
     const spoke = new THREE.Line(spokeGeo, new THREE.LineBasicMaterial({ color: 0x8b96a5, depthTest: false })); spoke.renderOrder = 10; spoke.visible = false; scene.add(spoke);
-    Object.assign(live.current, { renderer, scene, camera, controls, hemi, sun, ground, floor, car, ghost, track, trail, trailGeo, arc, arcGeo, wheelArrows, icc, spoke, spokeGeo });
+    Object.assign(live.current, { renderer, scene, camera, controls, hemi, sun, ground, floor, car, ghost, track, trail, trailGeo, arc, arcGeo, wheelArrows, icc, spoke, spokeGeo, ring });
     applyTheme(theme);
 
     const resize = () => {
@@ -136,6 +138,8 @@ export default function Scene3D({ theme }) {
         arrow.visible = Math.abs(w.speed) >= 1;
         arrow.setColor(new THREE.Color(w.speed >= 0 ? 0xf26b1d : 0x5b9cff));
       });
+      ring.visible = !!app.go;
+      if (app.go) ring.position.copy(toW(app.go.x, app.go.y, 0.06));
       const hasIcc = g.icc && Math.abs(g.icc[1]) < 3000 && g.kind !== 'stop';
       icc.visible = spoke.visible = !!hasIcc;
       if (hasIcc) {
@@ -146,8 +150,26 @@ export default function Scene3D({ theme }) {
       controls.update();
       renderer.render(scene, camera);
     };
+    // click the floor (not a drag) to send the car there when Click to go is on
+    const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hit = new THREE.Vector3();
+    let down = null;
+    const onDown = e => { down = { x: e.clientX, y: e.clientY }; };
+    const onUp = e => {
+      if (!down) return;
+      const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y); down = null;
+      if (moved > 5 || !app.goEnable || app.cfg.mode !== 'manual') return;
+      const r = renderer.domElement.getBoundingClientRect();
+      ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+      ray.setFromCamera(ndc, camera);
+      if (!ray.ray.intersectPlane(floorPlane, hit)) return;
+      goTo(hit.x / S, -hit.z / S);                       // world -> robot mm
+    };
+    renderer.domElement.addEventListener('pointerdown', onDown);
+    renderer.domElement.addEventListener('pointerup', onUp);
     raf = requestAnimationFrame(frame);
     return () => {
+      renderer.domElement.removeEventListener('pointerdown', onDown);
+      renderer.domElement.removeEventListener('pointerup', onUp);
       cancelAnimationFrame(raf); ro.disconnect(); controls.dispose();
       scene.traverse(o => { o.geometry?.dispose(); if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(x => x.dispose()); });
       renderer.dispose(); renderer.domElement.remove(); live.current = {};
