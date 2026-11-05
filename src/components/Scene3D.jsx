@@ -25,6 +25,7 @@ function buildCar() {
   board.position.set(-0.2, 1.32, 0); car.add(board);
   const caster = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 12), mat(0x9aa3ae));
   caster.position.set(-0.95, 0.16, 0); car.add(caster);
+  car.userData.plate = plate; car.userData.board = board;
   car.userData.wheels = [];
   for (const side of [1, -1]) {
     const hub = new THREE.Group();
@@ -45,6 +46,42 @@ function buildCar() {
   });
   car.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   return car;
+}
+
+// The Quarky board from the STEP file (see public/models/quarky.bin, made by the converter in tools/quarky/).
+// Board coordinates are mm: x across the board (0..50), y along it (0..80), z up (-8.6..3.8). It is placed on the
+// chassis with the 80 mm side along the car's length and centred, the board's bottom 130 mm above the ground.
+async function loadQuarkyBoard(car, material) {
+  const buf = await (await fetch(new URL('models/quarky.bin', document.baseURI))).arrayBuffer();
+  const dv = new DataView(buf);
+  const hlen = dv.getUint32(0, true), plen = dv.getUint32(4, true);
+  const head = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 8, hlen)));
+  const pos = new Float32Array(buf.slice(8 + hlen, 8 + hlen + plen));
+  const idx = new Uint32Array(buf.slice(8 + hlen + plen));
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setIndex(new THREE.BufferAttribute(idx, 1));
+  const S = 0.01;
+  const m = new THREE.Matrix4().set(
+    0, S, 0, -40 * S,
+    0, 0, S, 8.6 * S + 1.3,
+    -S, 0, 0, 25 * S,
+    0, 0, 0, 1);
+  g.applyMatrix4(m);
+  const mats = new Map(), mesh = new THREE.Group();
+  const ms = head.groups.map(gr => {
+    const key = gr.color.join(',');
+    if (!mats.has(key)) mats.set(key, new THREE.MeshStandardMaterial({ color: new THREE.Color(gr.color[0], gr.color[1], gr.color[2]), roughness: 0.55, metalness: 0.1 }));
+    return mats.get(key);
+  });
+  const uniq = [...mats.values()];
+  head.groups.forEach((gr, i) => g.addGroup(gr.iStart, gr.iCount, uniq.indexOf(ms[i])));
+  g.computeVertexNormals();
+  const board = new THREE.Mesh(g, uniq);
+  board.castShadow = true; board.receiveShadow = true;
+  car.add(board);
+  car.userData.plate.visible = false; car.userData.board.visible = false;
+  return board;
 }
 
 function trackMesh(points, color) {
@@ -83,6 +120,7 @@ export default function Scene3D({ theme }) {
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ roughness: 1 }));
     floor.rotation.x = -Math.PI / 2; floor.position.y = -0.002; floor.receiveShadow = true; scene.add(floor);
     const car = buildCar(); scene.add(car);
+    loadQuarkyBoard(car).catch(e => console.warn('Quarky board model not loaded:', e.message));
     const ghost = buildCar(); ghost.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 0.3; o.castShadow = false; } }); ghost.visible = false; scene.add(ghost);
     const track = trackMesh(simTrack(), SCENE.light.track); scene.add(track);
     const trailGeo = new THREE.BufferGeometry();
