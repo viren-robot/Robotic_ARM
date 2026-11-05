@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { app, poseNow, simSensors, simTrack, isSim, goTo } from '../lib/controller.js';
 import { mix, vmaxOf, D2R, clamp } from '../lib/kinematics.js';
+import { ikGeometry } from '../lib/ik.js';
 import Scene3D from './Scene3D.jsx';
 
 const PALETTE = {
@@ -53,8 +54,7 @@ function Map2D({ theme }) {
         cx.strokeStyle = C.ok; cx.lineWidth = 2; cx.beginPath(); cx.arc(gx, gy, 12, 0, 7);
         cx.moveTo(gx - 16, gy); cx.lineTo(gx + 16, gy); cx.moveTo(gx, gy - 16); cx.lineTo(gx, gy + 16); cx.stroke();
       }
-      const m = mix(app.v, app.w, app.cfg.track);
-      drawArc(cx, X, Y, s, p, m.l, m.r, C, app.cfg.track);
+      drawIK(cx, X, Y, s, p, C, app.cfg.track);
       drawCar(cx, X, Y, s, p, 1, C, false, app.cfg);
       if (isSim() && (app.go || Math.hypot(app.est.x - p.x, app.est.y - p.y) > 4)) drawCar(cx, X, Y, s, app.est, .35, C, true, app.cfg);
     };
@@ -113,19 +113,28 @@ function drawCar(cx, X, Y, s, p, alpha, C, ghost, cfg) {
   }
   cx.globalAlpha = 1;
 }
-function drawArc(cx, X, Y, s, p, vl, vr, C, T) {
-  if (Math.abs(vl) < 1 && Math.abs(vr) < 1) return;
-  const dir = (vl + vr) >= 0 ? 1 : -1, len = 380, dv = vr - vl;
-  cx.strokeStyle = C.blue; cx.lineWidth = 3; cx.setLineDash([8, 6]); cx.beginPath();
-  if (Math.abs(dv) < 0.5) { const [ax, ay] = carPt(p, 0, 0), [bx, by] = carPt(p, dir * len, 0); cx.moveTo(X(ax), Y(ay)); cx.lineTo(X(bx), Y(by)); }
-  else if (Math.abs(vl + vr) < 0.5) { const [ax, ay] = carPt(p, 0, 0); cx.arc(X(ax), Y(ay), (T / 2) * s, 0, 7); }
-  else {
-    const R = (T / 2) * (vr + vl) / dv, sweep = Math.min(len / Math.abs(R), Math.PI * 1.5);
-    for (let i = 0; i <= 40; i++) {
-      const th = dir * (i / 40) * sweep * Math.sign(dv);
-      const lx = R * Math.sin(th), ly = R * (1 - Math.cos(th));
-      const [wx, wy] = carPt(p, lx, ly); i ? cx.lineTo(X(wx), Y(wy)) : cx.moveTo(X(wx), Y(wy));
+// Inverse kinematics on the map: the predicted path, the turning centre, and an arrow per wheel (length = speed).
+function drawIK(cx, X, Y, s, p, C, T) {
+  const g = ikGeometry(app.v, app.w, T);
+  const pt = ([lx, ly]) => carPt(p, lx, ly);
+  if (g.path.length > 1) {
+    cx.strokeStyle = C.blue; cx.lineWidth = 2.5; cx.setLineDash([8, 6]); cx.beginPath();
+    g.path.forEach((q, i) => { const [x, y] = pt(q); i ? cx.lineTo(X(x), Y(y)) : cx.moveTo(X(x), Y(y)); });
+    cx.stroke(); cx.setLineDash([]);
+  }
+  if (g.icc && Math.abs(g.icc[1]) < 3000) {
+    const [ix, iy] = pt(g.icc), [ox, oy] = pt([0, 0]);
+    cx.strokeStyle = C.text; cx.lineWidth = 1; cx.setLineDash([3, 3]); cx.beginPath(); cx.moveTo(X(ox), Y(oy)); cx.lineTo(X(ix), Y(iy)); cx.stroke(); cx.setLineDash([]);
+    cx.fillStyle = C.ok; cx.beginPath(); cx.arc(X(ix), Y(iy), 4, 0, 7); cx.fill();
+  }
+  for (const w of g.wheels) {
+    const [x0, y0] = pt([0, w.y]), len = Math.abs(w.speed) / 100 * T * 0.9, dir = w.speed >= 0 ? 1 : -1;
+    const [x1, y1] = pt([dir * len, w.y]);
+    const col = Math.abs(w.speed) < 1 ? C.text : w.speed > 0 ? C.accent : C.blue;
+    cx.strokeStyle = col; cx.lineWidth = 4; cx.lineCap = 'round'; cx.beginPath(); cx.moveTo(X(x0), Y(y0)); cx.lineTo(X(x1), Y(y1)); cx.stroke();
+    if (Math.abs(w.speed) >= 1) {
+      const a = Math.atan2(Y(y1) - Y(y0), X(x1) - X(x0)); cx.fillStyle = col; cx.beginPath();
+      cx.moveTo(X(x1), Y(y1)); cx.lineTo(X(x1) - 10 * Math.cos(a - .4), Y(y1) - 10 * Math.sin(a - .4)); cx.lineTo(X(x1) - 10 * Math.cos(a + .4), Y(y1) - 10 * Math.sin(a + .4)); cx.fill();
     }
   }
-  cx.stroke(); cx.setLineDash([]);
 }

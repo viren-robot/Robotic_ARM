@@ -3,6 +3,7 @@ import { Alert, Button, Flexbox, Segmented, Slider, Tag } from '@lobehub/ui';
 import { app, setSetting, setMode, setGoEnable, cancelGo, canReverse, setStick } from '../lib/controller.js';
 import { useApp } from '../hooks.js';
 import { vmaxOf, mix } from '../lib/kinematics.js';
+import { ikGeometry } from '../lib/ik.js';
 
 /* ---------- small pieces ---------- */
 export function Bar({ label, value, text }) {
@@ -88,29 +89,63 @@ export function DrivePanel() {
   );
 }
 
-// Inverse kinematics, with the numbers substituted so you can follow them
+// Inverse kinematics: the formulas with your numbers, and a diagram of the same geometry
 function IKCard() {
-  const a = useApp(), c = a.cfg;
+  const a = useApp(), c = a.cfg, b = a.board;
+  const g = ikGeometry(a.v, a.w, c.track);
   const k = c.track / 2 / 50;
-  const x = mix(a.v, a.w, c.track), b = a.board;
-  const rawL = a.v - a.w * k, rawR = a.v + a.w * k;
   const f = n => (Math.round(n * 10) / 10).toFixed(1).replace('-0.0', '0.0');
   return (
     <div className="ik">
+      <IKDiagram g={g} track={c.track} />
       <div className="ik-row"><span>half-track factor</span><code>T/2 ÷ 50 = {c.track / 2} ÷ 50 = {k.toFixed(2)}</code></div>
-      <div className="ik-row"><span>left</span><code>v − w·k = {a.v} − ({a.w})·{k.toFixed(2)} = {f(rawL)} %</code></div>
-      <div className="ik-row"><span>right</span><code>v + w·k = {a.v} + ({a.w})·{k.toFixed(2)} = {f(rawR)} %</code></div>
-      {x.scale < 1 && <div className="ik-row warn"><span>over 100 %</span><code>both × {x.scale.toFixed(2)} → left {f(x.l)} %, right {f(x.r)} %</code></div>}
+      <div className="ik-row"><span>left</span><code>v − w·k = {a.v} − ({a.w})·{k.toFixed(2)} = {f(a.v - a.w * k)} %</code></div>
+      <div className="ik-row"><span>right</span><code>v + w·k = {a.v} + ({a.w})·{k.toFixed(2)} = {f(a.v + a.w * k)} %</code></div>
+      {g.scale < 1 && <div className="ik-row warn"><span>over 100 %</span><code>both × {g.scale.toFixed(2)} → left {f(g.vl)} %, right {f(g.vr)} %</code></div>}
+      <div className="ik-row"><span>turn</span><code>{g.kind === 'arc' ? `radius ${Math.round(Math.abs(g.R))} mm, centre on the ${g.R > 0 ? 'left' : 'right'}` : g.kind === 'spin' ? 'on the spot (centre fixed)' : g.kind === 'straight' ? 'straight' : 'stopped'}</code></div>
       <div className="ik-out">
-        <div><span className="muted small">Left wheel</span><b>{Math.round(x.l)} %</b></div>
-        <div><span className="muted small">Right wheel</span><b>{Math.round(x.r)} %</b></div>
+        <div><span className="muted small">Left wheel</span><b>{Math.round(g.vl)} %</b></div>
+        <div><span className="muted small">Right wheel</span><b>{Math.round(g.vr)} %</b></div>
       </div>
-      <Bar label="Left" value={x.l} />
-      <Bar label="Right" value={x.r} />
+      <Bar label="Left" value={g.vl} />
+      <Bar label="Right" value={g.vr} />
       <h4>Motor output reported by the car</h4>
       <Bar label="Motor L" value={b.l} />
       <Bar label="Motor R" value={b.r} />
     </div>
+  );
+}
+
+// Top-down diagram: forward is up. Wheel arrows show speed and direction, the dashed line is the path, the dot is the turning centre.
+export function IKDiagram({ g, track }) {
+  const W = 300, H = 220, cx = W / 2, cy = H / 2 + 20, s = 0.42;    // px per mm
+  const P = ([lx, ly]) => [cx - ly * s, cy - lx * s];
+  const path = g.path.map(P).map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+  const body = { w: track * s, l: 130 * s };
+  const arrow = (wy, speed) => {
+    const [x0, y0] = P([0, wy]), len = Math.abs(speed) * 0.9 * (track > 0 ? 1 : 1), dir = speed >= 0 ? -1 : 1;
+    const x1 = x0, y1 = y0 + dir * len;
+    const col = Math.abs(speed) < 1 ? 'var(--muted)' : speed > 0 ? 'var(--accent)' : 'var(--blue)';
+    return (
+      <g key={wy}>
+        <line x1={x0} y1={y0} x2={x1} y2={y1} stroke={col} strokeWidth="4" strokeLinecap="round" />
+        {Math.abs(speed) >= 1 && <polygon points={`${x1},${y1} ${x1 - 6},${y1 + (dir < 0 ? 9 : -9)} ${x1 + 6},${y1 + (dir < 0 ? 9 : -9)}`} fill={col} />}
+      </g>
+    );
+  };
+  const icc = g.icc ? P(g.icc) : null;
+  const [bx, by] = P([0, 0]);
+  return (
+    <svg className="ikdiag" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Wheel speeds: left ${Math.round(g.vl)} %, right ${Math.round(g.vr)} %`}>
+      <rect x="0" y="0" width={W} height={H} rx="10" className="ikbg" />
+      {icc && Math.abs(icc[0] - bx) < W * 3 && Math.abs(icc[1] - by) < H * 3 && <line x1={bx} y1={by} x2={icc[0]} y2={icc[1]} className="ikspoke" />}
+      {g.path.length > 1 && <polyline points={path} className="ikpath" />}
+      {icc && icc[0] > -W && icc[0] < 2 * W && icc[1] > -H && icc[1] < 2 * H && <circle cx={icc[0]} cy={icc[1]} r="4" className="ikicc" />}
+      <rect x={bx - body.l / 2} y={by - body.w / 2} width={body.l} height={body.w} rx="6" className="ikbody" />
+      <polygon points={`${bx},${by - body.l * 0.62} ${bx - 6},${by - body.l * 0.5} ${bx + 6},${by - body.l * 0.5}`} className="ikbody-nose" />
+      {g.wheels.map(w => arrow(w.y, w.speed))}
+      <text x={cx} y={H - 8} textAnchor="middle" className="iklabel">forward ↑ · turning centre ●</text>
+    </svg>
   );
 }
 

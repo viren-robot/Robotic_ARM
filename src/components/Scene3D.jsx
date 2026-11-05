@@ -2,7 +2,8 @@ import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { app, poseNow, simSensors, simTrack, isSim } from '../lib/controller.js';
-import { vmaxOf, mix } from '../lib/kinematics.js';
+import { vmaxOf } from '../lib/kinematics.js';
+import { ikGeometry } from '../lib/ik.js';
 
 // 3D view. The robot's frame is mm with z up; three.js is y-up, so world = (x, z, -y) / 100 (1 unit = 100 mm).
 const S = 0.01;
@@ -87,8 +88,13 @@ export default function Scene3D({ theme }) {
     const trailGeo = new THREE.BufferGeometry();
     const trail = new THREE.Line(trailGeo, new THREE.LineBasicMaterial({ color: SCENE.light.trail })); scene.add(trail);
     const arcGeo = new THREE.BufferGeometry();
-    const arc = new THREE.Line(arcGeo, new THREE.LineBasicMaterial({ color: SCENE.light.arc })); scene.add(arc);
-    Object.assign(live.current, { renderer, scene, camera, controls, hemi, sun, ground, floor, car, ghost, track, trail, trailGeo, arc, arcGeo });
+    const arc = new THREE.Line(arcGeo, new THREE.LineBasicMaterial({ color: SCENE.light.arc, linewidth: 2 })); scene.add(arc);
+    // inverse kinematics on the car: one arrow per wheel (length = speed), the turning centre and the spoke to it
+    const wheelArrows = [0, 1].map(() => { const a = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1.8, 0), 0.5, 0xf26b1d, 0.3, 0.2); a.renderOrder = 10; a.traverse(o => { if (o.material) { o.material.depthTest = false; o.material.transparent = true; } }); car.add(a); return a; });
+    const icc = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 12), new THREE.MeshBasicMaterial({ color: 0x35e070, depthTest: false })); icc.renderOrder = 10; icc.visible = false; scene.add(icc);
+    const spokeGeo = new THREE.BufferGeometry();
+    const spoke = new THREE.Line(spokeGeo, new THREE.LineBasicMaterial({ color: 0x8b96a5, depthTest: false })); spoke.renderOrder = 10; spoke.visible = false; scene.add(spoke);
+    Object.assign(live.current, { renderer, scene, camera, controls, hemi, sun, ground, floor, car, ghost, track, trail, trailGeo, arc, arcGeo, wheelArrows, icc, spoke, spokeGeo });
     applyTheme(theme);
 
     const resize = () => {
@@ -119,9 +125,24 @@ export default function Scene3D({ theme }) {
         lastTrail = app.trail.length;
         trailGeo.setFromPoints(app.trail.map(([x, y]) => toW(x, y, 0.03)));
       }
-      // turning arc: the path the car would follow at the commanded wheel speeds
-      const m = mix(app.v, app.w, c.track);
-      updateArc(arcGeo, p, m.l, m.r, c.track);
+      // inverse kinematics: the path, the wheel arrows and the turning centre, all from the shared geometry
+      const g = ikGeometry(app.v, app.w, c.track);
+      arcGeo.setFromPoints(g.path.length > 1 ? g.path.map(([lx, ly]) => { const [x, y] = carPt(p, lx, ly); return toW(x, y, 0.05); }) : []);
+      wheelArrows.forEach((arrow, i) => {
+        const w = g.wheels[i], len = Math.abs(w.speed) / 100 * 1.8;
+        arrow.position.set(0.15, 1.8, -w.y * S * 1.8);
+        arrow.setDirection(new THREE.Vector3(w.speed >= 0 ? 1 : -1, 0, 0));
+        arrow.setLength(Math.max(0.001, len), 0.3, 0.2);
+        arrow.visible = Math.abs(w.speed) >= 1;
+        arrow.setColor(new THREE.Color(w.speed >= 0 ? 0xf26b1d : 0x5b9cff));
+      });
+      const hasIcc = g.icc && Math.abs(g.icc[1]) < 3000 && g.kind !== 'stop';
+      icc.visible = spoke.visible = !!hasIcc;
+      if (hasIcc) {
+        const [ix, iy] = carPt(p, g.icc[0], g.icc[1]), [ox, oy] = carPt(p, 0, 0);
+        icc.position.copy(toW(ix, iy, 0.12));
+        spokeGeo.setFromPoints([toW(ox, oy, 1.8), toW(ix, iy, 0.12)]);
+      }
       controls.update();
       renderer.render(scene, camera);
     };
@@ -154,19 +175,4 @@ export default function Scene3D({ theme }) {
   return <div className="scene3d" ref={host} aria-label="3D view of the car on the track" />;
 }
 
-// the arc the car's centre follows at these wheel speeds (same geometry as the 2D map)
-function updateArc(geo, p, vl, vr, T) {
-  const pts = [];
-  const cs = Math.cos(p.th), sn = Math.sin(p.th);
-  const at = (lx, ly) => [p.x + lx * cs - ly * sn, p.y + lx * sn + ly * cs];
-  const dv = vr - vl, dir = (vl + vr) >= 0 ? 1 : -1, len = 380;
-  if (Math.abs(vl) < 1 && Math.abs(vr) < 1) { geo.setFromPoints([]); return; }
-  if (Math.abs(dv) < 0.5) { for (let i = 0; i <= 20; i++) { const [x, y] = at(0, 0); const [x2, y2] = at(dir * len * i / 20, 0); pts.push(toW(i ? x2 : x, i ? y2 : y, 0.05)); } }
-  else if (Math.abs(vl + vr) < 0.5) { for (let i = 0; i <= 48; i++) { const a = i / 48 * Math.PI * 2, r = T / 2; pts.push(toW(p.x + r * Math.cos(a), p.y + r * Math.sin(a), 0.05)); } }
-  else {
-    const R = (T / 2) * (vr + vl) / dv, sweep = Math.min(len / Math.abs(R), Math.PI * 1.5);
-    for (let i = 0; i <= 40; i++) { const th = dir * (i / 40) * sweep * Math.sign(dv); const [x, y] = at(R * Math.sin(th), R * (1 - Math.cos(th))); pts.push(toW(x, y, 0.05)); }
-  }
-  geo.setFromPoints(pts);
-}
-
+function carPt(p, lx, ly) { const cs = Math.cos(p.th), sn = Math.sin(p.th); return [p.x + lx * cs - ly * sn, p.y + lx * sn + ly * cs]; }
