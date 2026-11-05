@@ -1,110 +1,124 @@
-# ArmCtl — Robotic Arm Control Website
+# STEAM_CAR
 
-A single-file web app (`index.html`) to control a 4-axis 3D-printed robotic arm driven by **4× MG90S** servos and a **Raspberry Pi Pico H** **over USB**.
+Control page, firmware and browser flasher for a two-wheel car built on the **STEMpedia Quarky** (classic ESP32).
 
-The arm is the "Robotic arm - brazo robótico" frame (8 printed parts): base, arm base, upper arm, forearm, gripper adapter, gripper base, gripper rack and gear.
+- **Control page** (`index.html`, one file, no build step): drive with a joystick or the keyboard, or follow a line. It talks to the car over USB with Web Serial (Chrome or Edge). A Simulator with a virtual car works without any hardware.
+- **Car firmware** (`firmware/steam_car/steam_car.ino`): motor control, the JSON-lines protocol, and line following on the board.
+- **IR sensor finder** (`firmware/ir_sensor_finder/ir_sensor_finder.ino`): finds the GPIO pins of the line sensors.
+- **Flash firmware tab**: installs either firmware from the browser, with no Arduino IDE needed. It uses esptool-js 0.7.0, vendored in `vendor/esptool-js-0.7.0/`.
 
-| Connection | Pico pin | Wire |
-|------------|----------|------|
-| Base servo (MG90S, −90…90°) | GP0 | Signal wire, orange or yellow |
-| Shoulder servo (MG90S, −45…85°) | GP2 | Signal wire |
-| Elbow servo (MG90S, −60…90°) | GP4 | Signal wire |
-| Gripper servo (MG90S, 0…100 %, ~21 mm jaw travel) | GP6 | Signal wire |
-
-Pins and limits can be changed in the page.
-
-## Features
-
-- **Animations** (Animate tab):
-  - Build keyframe animations on a timeline and play them on the simulator or the real arm.
-  - **Joint** moves turn all joints together. **Straight** moves drive the gripper along a straight line using inverse kinematics.
-  - Smooth or linear easing, loop, and 0.25×–2× playback speed.
-  - Drag on the timeline to scrub, and drag keyframes to retime them.
-  - **Record** turns your live movements into keyframes.
-  - Segments faster than an MG90S can turn, or straight lines the arm can't follow, are marked red.
-  - Built-in examples: *Pick and place* and *Wave*. Animations can be exported and imported as JSON.
-- **Inverse kinematics (IK)**:
-  - Drag the blue ball in the 3D view to move the gripper.
-  - Or type an X/Y/Z target, or jog it with the arrow keys and buttons.
-  - The arm has no wrist, so the gripper always points along the forearm.
-- **Simulator mode**: everything (joints, IK, animations) runs on the 3D model with realistic MG90S speeds, and nothing is sent to the arm. Includes practice exercises. Switch to **Live** to drive the real arm.
-- **3D view of the printed frame**: the STL parts are built into the page and move like the real arm, including the gripper rack and gear. There's a 2D fallback when offline.
-- **USB connection** (Web Serial): choose which port the commands go to from the dropdown next to **Connect USB** (or in Settings → Ports). Pick **Choose another port…** to open the browser's picker, which shows the COM / tty names. The choice is remembered, and the page reconnects when that port is plugged back in.
-- **Safety system** (Safety tab), so the arm doesn't break:
-  - **Collision guard**: every move (sliders, keys, IK, poses, animations) is checked first. A move that would hit the table, the base, the shoulder or the upper arm is stopped.
-  - **Joint limits** and calibrated servo **min/max angles** are never exceeded.
-  - **Smooth motion**: speed and acceleration limits.
-  - **Animation check**: animations with red segments (too fast, unreachable, collision) can't play on the real arm.
-  - **On the Pico** (`main.py`):
-    - Every pulse is clamped to the servo's range.
-    - A speed limit applies even if the page sends a jump.
-    - The Pico holds position if commands stop (USB unplugged, page closed).
-    - **E-STOP** freezes the arm in place (or optionally releases the servos).
-- **Calibration** of servo centres, directions, limits and home pose. **Pin assignments** with a pinout diagram.
-- **Test tab**: checks the USB connection, the main.py version and the mode, then checks each servo. A signal wire check shows whether something is attached to its pin, and a **Wiggle** button moves the servo a few degrees so you can confirm it really moves. Includes troubleshooting tips.
-- **Assembly guide** (Assembly tab): 11 steps in the 3D view. The parts for each step slide into place in blue, the camera follows, and the last step plays a test movement. Includes a button that moves the servos to the assembly position before you fit the horns.
-- **Two hardware profiles** (Settings → Hardware): the Raspberry Pi Pico H with 4 servos, or a **STEMpedia Quarky** (ESP32) with only 2 servo ports. See [Quarky (2 servos)](#quarky-2-servos).
-- **main.py upload from the page**: one click copies the firmware onto the Pico over USB, no Thonny needed.
-- **E-STOP** button (or press `Esc`). Light and dark themes. Works on phones (simulator only: phones have no Web Serial).
-
-Arm dimensions, measured between the servo shafts in the STL files: shoulder axis 61 mm above the table, upper arm 81 mm, elbow to gripper tool point 121 mm (≈ 200 mm reach).
+Live site (GitHub Pages): **https://viren-robot.github.io/Steam_CAR/** (enable it once: Settings → Pages → Source: **GitHub Actions**).
 
 ## Quick start
 
-1. Open `index.html` in **Chrome or Edge** on a computer. It starts in **Simulator** mode. Try the Animate tab.
-2. Install MicroPython on the Pico (once): hold BOOTSEL while plugging it in, then copy the MicroPython `.uf2` ([micropython.org](https://micropython.org/download/RPI_PICO/) — the RPI_PICO file) onto the RPI-RP2 drive.
-3. In the page, go to **Settings → Pico firmware** and click **Upload to Pico**. The page copies `main.py` onto the Pico over USB (no Thonny needed), checks it, starts it and connects. Close Thonny first if it's open. To copy it by hand instead, use "Copy main.py yourself instead" in the same card.
-4. Switch to **Live**. Next time, just click **Connect USB**.
-5. Building the arm? Follow the **Assembly** tab step by step.
-6. Calibrate each servo in the **Calibration** tab. Ideally do this before fitting the horns: drive the servo to its center, then fit the horn with the joint at its zero position.
+1. Open the site in **Chrome** or **Edge** on a computer.
+2. Go to **Flash firmware**, click **Choose port & detect chip**, and pick the Quarky's port. The page checks that the board is a classic ESP32 and shows its chip and MAC address.
+3. Choose **STEAM_CAR car firmware** and click **Flash firmware**. The page downloads the file, checks its SHA-256 against `firmware/manifest.json`, writes it, resets the board, and reconnects.
+4. Choose **Real car (USB)** at the top of the page and click **Connect USB**.
 
-## Built-in main.py uploader
+To try the page first, leave **Simulator** selected: everything works without the car.
 
-**Upload to Pico** uses MicroPython's raw REPL over the same USB port: Ctrl-C stops the running `main.py`, Ctrl-A enters raw mode, and the file is written in small blocks to `main.py.tmp`. The page then reads back its length and checksum, and renames it to `main.py`, so an interrupted upload leaves the old one working. It also deletes `arm_cfg.json` (settings saved from the page), so the settings built into the new `main.py` apply, and soft-reboots the Pico to start it.
+## Driving
 
-## Quarky (2 servos)
-
-The Quarky profile is for an original STEMpedia Quarky (ESP32) with no expansion board. It has only two servo ports, so two MG90S drive two joints at a time:
-
-| Mode | Key | Servo 1 | Servo 2 | No servo |
-|---|---|---|---|---|
-| G | `G` | Gripper | Base | Shoulder, elbow |
-| E | `E` | Shoulder | Elbow | Gripper, base |
-
-- **Mode on screen:** the active mode and the servo-to-joint mapping are shown in the Control tab and on the 3D view. In Live mode the joints without a servo are greyed out and locked: they are unpowered and keep their last angle in the model. The 3D view and IK still show all four joints.
-- **Calibration** (center, invert, min/max) belongs to the joint, so it follows the joint to whichever port it is on.
-- **Changing mode never makes a servo jump:** the ports first hold their current pulses, the Quarky gets the new joints' limits, then each port moves to its new joint's angle at the speed limit (and the sketch's own slew limit).
-- **Animations** each have a hardware mode (G or E, Animate tab), saved with the animation and in Export / Import. New animations take the current mode.
-  - In Live mode, **Play** switches the Quarky to the animation's mode (asking first if it differs), moves to the first keyframe at the speed limit, then streams only that mode's two joints. The other two are drawn grey on the timeline and aren't sent.
-  - The Simulator plays all four joints.
-  - **Record** captures the two active joints; the other two keep the angles of the last keyframe.
-  - The red "too fast" check uses the two active joints in Live mode and all four in the Simulator.
-  - While an animation plays or records, `G` / `E` and the mode buttons are locked.
-- **Firmware:** Settings or Pins → **Download Quarky sketch (.ino)**: an Arduino sketch for the ESP32 core using the **ESP32Servo** library, speaking the same JSON-lines protocol as `main.py`. Its pins are the constants `SERVO1_PIN` and `SERVO2_PIN` at the top, filled in from the Pins tab. They are **not known yet**: until you set them, the sketch stops with a compile error telling you to. **Download servo port finder (.ino)** drives one GPIO at a time and prints its number, so you can see which pin moves the servo plugged into each port.
-- **Power:** the Quarky's servo port supplies only about 1 A. Power the servos from a separate 5 V supply and connect its ground to the Quarky's GND.
-
-## Keyboard
-
-| Key | Action |
+| Mode | How |
 |---|---|
-| `Q`/`A`, `W`/`S`, `Z`/`X`, `R`/`F` | Base, shoulder, elbow, gripper |
-| `G` / `E` | Quarky profile: servos on gripper + base / on shoulder + elbow |
-| Arrow keys, `PgUp`/`PgDn` | Move the gripper with IK |
-| `Space` | Play / pause the animation |
-| `K` | Add a keyframe |
-| `Home` | Home pose |
-| `Esc` | E-STOP |
+| **MANUAL** | Joystick (drag) or `W` `A` `S` `D` / arrow keys. `Space` or `Esc` stops. Commands go out 20 times a second; the car stops by itself if they stop arriving for 0.4 s. |
+| **LINE FOLLOW** | Two IR sensors on the car decide the steering. The car runs its own loop; the page only has to keep talking to it (silence for 2 s stops the car). |
 
-## Wiring
+The page converts **forward speed `v`** and **turn rate `w`** (both −100…100 %) into wheel speeds:
 
-- **Servo signal wires** (orange or yellow): GP0 base, GP2 shoulder, GP4 elbow, GP6 gripper.
-- **Servo power:** red wires to +5 V and brown/black wires to ground, from a separate 5 V supply (≥ 3 A), not from the Pico or USB.
-- **Common ground:** connect the supply's ground to a Pico GND pin.
+```
+left  = v − w·T/2        right = v + w·T/2        T = track width (mm)
+```
 
-## USB protocol
+If one wheel would go past 100 %, both are scaled by the same factor. The page shows the live left/right values and a top-down view with the turning arc. Track width and wheel diameter are in **Settings**, together with invert and swap for each motor.
 
-One JSON object per line:
+**Click to go** (Drive tab) drives to a point on the map. The car has no encoders, so its position is estimated by dead reckoning and drifts. Treat it as a rough guide.
 
-- `{"t":"pos","us":[…4 pulse widths…]}` sets the four servo pulse widths.
-- `{"t":"off"}` releases the servos.
-- `cfg`, `ping` and `hello` handle setup and the keep-alive.
+## Pins
+
+| Function | GPIO | Set in |
+|---|---|---|
+| Motor L speed (PWM) | 16 | `LEFT_PWM_PIN` |
+| Motor R speed (PWM) | 17 | `RIGHT_PWM_PIN` |
+| Motor L direction | not set | `LEFT_DIR_PIN` |
+| Motor R direction | not set | `RIGHT_DIR_PIN` |
+| Left line sensor | not set | `IR_LEFT_PIN` |
+| Right line sensor | not set | `IR_RIGHT_PIN` |
+
+Pins marked **not set** are `-1` in the firmware. That is deliberate:
+
+- **No direction pins → no reverse.** A single-pin motor driver only spins forward, so negative wheel speeds are limited to 0. Set the direction pins to get reverse; the code is the `onDrive()` pattern of the Robot-car library.
+- **No sensor pins → no line follow.** The page then shows "line follow not available" and says why.
+
+Find the sensor pins with the **IR sensor finder** firmware (Flash tab → choose it → flash). It prints a `CHANGED` line each time a pin's reading changes. Move each sensor onto the line and back: the pin that changes is that sensor's. Then put the numbers in `steam_car.ino` and flash the car firmware again.
+
+The motor code is taken unchanged from the Robot-car library's `drive()`. Its debug `Serial.printf` is left out, because it would mix text into the JSON messages.
+
+## Power and wiring
+
+- **The Quarky's servo/motor port supplies only about 1 A.** Power the motors from a **separate 5 V supply** (≥ 2 A) and connect its ground to the Quarky's **GND**. Share the ground; don't use the Quarky's port for the motor power.
+- Motor driver: connect PWM (and direction) inputs as set in the pin table above.
+- IR sensors: digital output to the GPIO you found, 3.3 V and GND from the Quarky.
+
+## Flashing: troubleshooting
+
+**The chip isn't detected ("Failed to connect" / "Could not detect the chip")**
+- Put the board in download mode by hand: unplug the USB cable, hold **BOOT** (also called IO0 or FLASH), plug the cable in, and keep holding for about 2 seconds. Then click **Choose port & detect chip** again.
+- Or, with the cable plugged in: hold **BOOT**, tap **RST / EN** once, then release **BOOT**.
+- If the board has no BOOT button, try another USB cable (some are charge-only) and the 115200 speed.
+
+**The port is busy**
+- Only one program can use a serial port at a time. Close the Arduino IDE (and its Serial Monitor), Thonny, PuTTY, and any other browser tab using a serial page. The control page closes its own connection before it flashes.
+- Unplug and replug the cable, then choose the port again.
+- Linux: add your user to the `dialout` group (`sudo usermod -aG dialout $USER`, then log out and in). Windows: check Device Manager for the COM port and install the CH340 or CP210x driver if it's missing.
+
+**A flash failed or stopped half-way**
+- Just flash again. The chip's built-in bootloader stays intact, so the board can always be flashed again.
+- Use 115200, a better cable, and a USB port directly on the computer.
+- If it still fails, enter download mode by hand, tick **Erase all flash first**, and flash again. Erasing also deletes everything else stored on the board.
+- If the hash check fails, reload the page with Ctrl+F5 so it fetches the file and manifest again.
+
+**After flashing, the page can't talk to the car**
+- Wait a few seconds; the board restarts when its port opens. Use **Reconnect**.
+- The console should show a `hello` from `steam-car`. If you flashed the IR sensor finder, it doesn't answer the car page: flash the car firmware again.
+
+## Building the firmware
+
+The site is built and published by `.github/workflows/pages.yml` on every push: it compiles both sketches with arduino-cli 1.3.1 and the ESP32 core 3.3.12, writes `firmware/manifest.json` (version, build time, size, SHA-256, flash offset), and deploys to Pages. To build locally:
+
+```sh
+arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+arduino-cli core update-index && arduino-cli core install esp32:esp32@3.3.12
+tools/build_firmware.sh 1.0.0      # writes _site/firmware/ and manifest.json
+```
+
+Firmware images are written at offset `0x0` as one merged image (bootloader, partition table and application).
+
+## Serial protocol
+
+JSON lines, 115200 baud. The page sends one object per line; the car answers with JSON lines.
+
+| Page → car | Car → page |
+|---|---|
+| `{"t":"hello"}` | `{"t":"hello","fw","ver","reverse","line","pins":{…}}` |
+| `{"t":"cfg","track","slew","base","kp","lost","search","invL","invR","swap","irHigh"}` | `{"t":"ack","what":"cfg","ok":true}` |
+| `{"t":"drive","v":50,"w":-20}` (manual only) | `{"t":"status","mode","state","l","r","s":[left,right]}` (every 100 ms) |
+| `{"t":"mode","m":"manual"\|"line"}` | `{"t":"ack","what":"mode","ok"}` |
+| `{"t":"stop"}` | `{"t":"ack","what":"stop"}` |
+| `{"t":"ping","id":n}` | `{"t":"ack","what":"ping","id":n}` |
+| | `{"t":"log","msg":"…"}` (e.g. drive timeout) |
+
+## Repository layout
+
+```
+index.html                       the control page (single file)
+vendor/esptool-js-0.7.0/         esptool-js 0.7.0 bundle, pinned (see VENDORED.md)
+firmware/steam_car/              car firmware
+firmware/ir_sensor_finder/       IR sensor finder
+tools/build_firmware.sh          builds both sketches → _site/firmware/
+tools/make_manifest.py           writes manifest.json (version, size, SHA-256, offsets)
+.github/workflows/pages.yml      build + publish on every push
+```
+
+The Robotic_ARM (robotic arm) page that used to be here is still in the git history.

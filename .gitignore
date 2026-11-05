@@ -1,0 +1,15 @@
+# build output
+build/
+_site/
+*.bin
+*.elf
+*.map
+# Arduino / PlatformIO
+.pio/
+*.ino.cpp
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
