@@ -43,6 +43,7 @@ Pins and limits can be changed in the page.
 - **Calibration** of servo centres, directions, limits and home pose. **Pin assignments** with a pinout diagram.
 - **Test tab**: checks the USB connection, the main.py version and the mode, then checks each servo. A signal wire check shows whether something is attached to its pin, and a **Wiggle** button moves the servo a few degrees so you can confirm it really moves. Includes troubleshooting tips.
 - **Assembly guide** (Assembly tab): 11 steps in the 3D view. The parts for each step slide into place in blue, the camera follows, and the last step plays a test movement. Includes a button that moves the servos to the assembly position before you fit the horns.
+- **Two hardware profiles** (Settings → Hardware): the Raspberry Pi Pico H with 4 servos, or a **STEMpedia Quarky** (ESP32) with only 2 servo ports. See [Quarky (2 servos)](#quarky-2-servos).
 - **main.py upload from the page**: one click copies the firmware onto the Pico over USB, no Thonny needed.
 - **E-STOP** button (or press `Esc`). Light and dark themes. Works on phones (simulator only: phones have no Web Serial).
 
@@ -61,11 +62,33 @@ Arm dimensions, measured between the servo shafts in the STL files: shoulder axi
 
 **Upload to Pico** uses MicroPython's raw REPL over the same USB port: Ctrl-C stops the running `main.py`, Ctrl-A enters raw mode, and the file is written in small blocks to `main.py.tmp`. The page then reads back its length and checksum, and renames it to `main.py`, so an interrupted upload leaves the old one working. It also deletes `arm_cfg.json` (settings saved from the page), so the settings built into the new `main.py` apply, and soft-reboots the Pico to start it.
 
+## Quarky (2 servos)
+
+The Quarky profile is for an original STEMpedia Quarky (ESP32) with no expansion board. It has only two servo ports, so two MG90S drive two joints at a time:
+
+| Mode | Key | Servo 1 | Servo 2 | No servo |
+|---|---|---|---|---|
+| G | `G` | Gripper | Base | Shoulder, elbow |
+| E | `E` | Shoulder | Elbow | Gripper, base |
+
+- **Mode on screen:** the active mode and the servo-to-joint mapping are shown in the Control tab and on the 3D view. In Live mode the joints without a servo are greyed out and locked: they are unpowered and keep their last angle in the model. The 3D view and IK still show all four joints.
+- **Calibration** (center, invert, min/max) belongs to the joint, so it follows the joint to whichever port it is on.
+- **Changing mode never makes a servo jump:** the ports first hold their current pulses, the Quarky gets the new joints' limits, then each port moves to its new joint's angle at the speed limit (and the sketch's own slew limit).
+- **Animations** each have a hardware mode (G or E, Animate tab), saved with the animation and in Export / Import. New animations take the current mode.
+  - In Live mode, **Play** switches the Quarky to the animation's mode (asking first if it differs), moves to the first keyframe at the speed limit, then streams only that mode's two joints. The other two are drawn grey on the timeline and aren't sent.
+  - The Simulator plays all four joints.
+  - **Record** captures the two active joints; the other two keep the angles of the last keyframe.
+  - The red "too fast" check uses the two active joints in Live mode and all four in the Simulator.
+  - While an animation plays or records, `G` / `E` and the mode buttons are locked.
+- **Firmware:** Settings or Pins → **Download Quarky sketch (.ino)**: an Arduino sketch for the ESP32 core using the **ESP32Servo** library, speaking the same JSON-lines protocol as `main.py`. Its pins are the constants `SERVO1_PIN` and `SERVO2_PIN` at the top, filled in from the Pins tab. They are **not known yet**: until you set them, the sketch stops with a compile error telling you to. **Download servo port finder (.ino)** drives one GPIO at a time and prints its number, so you can see which pin moves the servo plugged into each port.
+- **Power:** the Quarky's servo port supplies only about 1 A. Power the servos from a separate 5 V supply and connect its ground to the Quarky's GND.
+
 ## Keyboard
 
 | Key | Action |
 |---|---|
-| `Q`/`A`, `W`/`S`, `E`/`D`, `R`/`F` | Base, shoulder, elbow, gripper |
+| `Q`/`A`, `W`/`S`, `Z`/`X`, `R`/`F` | Base, shoulder, elbow, gripper |
+| `G` / `E` | Quarky profile: servos on gripper + base / on shoulder + elbow |
 | Arrow keys, `PgUp`/`PgDn` | Move the gripper with IK |
 | `Space` | Play / pause the animation |
 | `K` | Add a keyframe |

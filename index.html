@@ -174,6 +174,17 @@ main { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(380px, 1fr
 /* ---------- joints ---------- */
 .jrow { padding: 8px 0; border-bottom: 1px dashed var(--border); }
 .jrow:last-child { border-bottom: 0; }
+.jrow.nosvc .jctl, .jrow.nosvc .jname, .jrow.nosvc .jtype { opacity: .45; }
+.jrow .jnote { display: none; font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+.jrow.nosvc .jnote { display: block; }
+body:not([data-hw="quarky"]) .only-quarky, body[data-hw="quarky"] .only-pico { display: none !important; }
+.qkmap { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.qkmap span { font-size: 12px; padding: 3px 8px; border-radius: 6px; background: var(--panel2); border: 1px solid var(--border); }
+.qkmap b { color: var(--accent); }
+.seg.qk button b { font-family: var(--mono); margin-right: 4px; }
+.badge.qk { background: var(--panel); color: var(--text); border: 1px solid var(--border); font-weight: 600; }
+.qklock { font-size: 12px; color: var(--warn); margin-top: 6px; }
+.qklock:empty { display: none; }
 .jhead { display: flex; align-items: baseline; gap: 8px; font-size: 13px; margin-bottom: 4px; }
 .jname { font-weight: 650; }
 .jlim { margin-left: auto; color: var(--muted); font-size: 11px; font-family: var(--mono); }
@@ -240,7 +251,7 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
 <header>
   <div class="brand">
     <div class="logo"><svg width="20" height="20" viewBox="0 0 64 64"><path d="M10 54h26M22 54V34l14-16 14 8" stroke="#fff" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-    <div><h1>ArmCtl</h1><span>4-axis arm · 4× MG90S · Raspberry Pi Pico H</span></div>
+    <div><h1>ArmCtl</h1><span id="hwSub">4-axis arm · 4× MG90S · Raspberry Pi Pico H</span></div>
   </div>
   <div class="seg" id="modeSeg" title="Simulator mode never sends anything to the arm">
     <button data-mode="sim">Simulator</button>
@@ -258,6 +269,7 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
     <canvas id="scene"></canvas>
     <div class="ov tl">
       <span class="badge sim" id="modeBadge">SIMULATOR</span>
+      <span class="badge qk only-quarky" id="qkBadge"></span>
       <div class="glass readout" id="readout"></div>
       <div class="warnbox" id="warnBox"></div>
     </div>
@@ -288,6 +300,12 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
 
     <!-- ================= CONTROL ================= -->
     <div class="panel on" id="tab-control">
+      <div class="card only-quarky">
+        <div class="head"><h3>Quarky servo mode</h3><span class="small muted">keys <kbd>G</kbd> / <kbd>E</kbd></span></div>
+        <div class="seg qk qkSeg"><button data-qk="G"><b>G</b>Gripper + Base</button><button data-qk="E"><b>E</b>Shoulder + Elbow</button></div>
+        <div class="qkmap"></div>
+        <div class="qklock"></div>
+      </div>
       <div class="card">
         <div class="head"><h3>Joint control</h3>
           <button class="btn sm" id="homeBtn">Home</button>
@@ -343,7 +361,7 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
       <div class="card small">
         <div class="head"><h3>Keyboard</h3></div>
         <div class="grid2">
-          <div><kbd>Q</kbd>/<kbd>A</kbd> base · <kbd>W</kbd>/<kbd>S</kbd> shoulder<br><kbd>E</kbd>/<kbd>D</kbd> elbow · <kbd>R</kbd>/<kbd>F</kbd> gripper</div>
+          <div><kbd>Q</kbd>/<kbd>A</kbd> base · <kbd>W</kbd>/<kbd>S</kbd> shoulder<br><kbd>Z</kbd>/<kbd>X</kbd> elbow · <kbd>R</kbd>/<kbd>F</kbd> gripper<br><span class="only-quarky">Quarky: <kbd>G</kbd> gripper + base · <kbd>E</kbd> shoulder + elbow</span></div>
           <div><kbd>←</kbd><kbd>→</kbd> IK Y · <kbd>↑</kbd><kbd>↓</kbd> IK X · <kbd>PgUp</kbd>/<kbd>PgDn</kbd> IK Z<br><kbd>Space</kbd> play/pause animation · <kbd>K</kbd> add keyframe<br><kbd>Home</kbd> home pose · <kbd>Esc</kbd> E-stop</div>
         </div>
       </div>
@@ -360,6 +378,12 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
           <button class="btn sm" id="animRename">Rename</button>
           <button class="btn sm ghost" id="animDel">Delete</button>
         </div>
+        <div class="row only-quarky" style="margin-top:8px">
+          <span class="small muted">Hardware mode</span>
+          <div class="seg qk" id="animHwSeg"><button data-anim-hw="G"><b>G</b>Gripper + Base</button><button data-anim-hw="E"><b>E</b>Shoulder + Elbow</button></div>
+          <span class="small muted grow" id="animHwNote"></span>
+        </div>
+        <div class="qklock only-quarky"></div>
         <canvas class="timeline" id="timeline" aria-label="Timeline: drag to scrub, drag a diamond to retime its keyframe"></canvas>
         <div class="legend" id="legend"></div>
         <div class="row">
@@ -400,6 +424,7 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
           <li><b>● Record</b> turns your live movements into keyframes.</li>
           <li>Red parts of the timeline are faster than an MG90S can turn (or a straight line the arm can't follow): give them more time.</li>
           <li>In <b>Simulator</b> mode only the 3D arm moves. In <b>Live</b> mode, Play first moves the real arm to the first keyframe, then streams the animation over USB.</li>
+          <li class="only-quarky"><b>Quarky:</b> each animation has a hardware mode. In Live mode Play switches the Quarky to it and drives only its two joints (the grey curves aren't sent). Keyframes keep all four joints, so the Simulator plays the whole animation.</li>
         </ol>
         <div class="row" style="margin-top:10px"><label class="chk"><input type="checkbox" data-bind="view.animPath"> Show the gripper's path in the 3D view</label></div>
       </div>
@@ -513,7 +538,7 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
       </div>
       <div class="card">
         <div class="head"><h3>Servos</h3><button class="btn sm" id="testWiggleAll">Wiggle each in turn</button></div>
-        <p class="small muted" style="margin-top:0">A servo can't tell the Pico it's there, so there are two checks. The <b>signal wire check</b> runs by itself; some servos can't be detected this way. <b>Wiggle</b> moves the servo a few degrees and back: tell the page if it moved.</p>
+        <p class="small muted" style="margin-top:0">A servo can't tell the board it's there, so there are two checks. The <b>signal wire check</b> runs by itself (Pico only); some servos can't be detected this way. <b>Wiggle</b> moves the servo a few degrees and back: tell the page if it moved.</p>
         <div class="tablewrap"><table id="testServos" class="testtable"></table></div>
         <p class="small" id="testAsk" aria-live="polite"></p>
       </div>
@@ -522,7 +547,7 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
         <ul style="margin:0;padding-left:18px">
           <li><b>Plug orientation:</b> brown/black = ground, red = +5 V, orange/yellow = signal. A plug turned round won't move (and can damage the servo).</li>
           <li><b>Signal pin:</b> the orange wire must be on the GPIO shown in the table (see the Pins tab for where that is on the board).</li>
-          <li><b>Power:</b> the servo's red wire needs 5 V (VBUS for one servo, or a separate supply). With a separate supply, its ground must be connected to a Pico GND.</li>
+          <li><b>Power:</b> the servo's red wire needs 5 V (the Pico's VBUS for one servo, or a separate supply). With a separate supply, its ground must be connected to the board's GND.</li>
           <li><b>Try another servo</b> on the same pin, or this servo on another joint's pin, to tell a broken servo from a wiring problem.</li>
         </ul>
       </div>
@@ -564,7 +589,22 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
 
     <!-- ================= PINS ================= -->
     <div class="panel" id="tab-pins">
-      <div class="card">
+      <div class="card only-quarky">
+        <div class="head"><h3>Quarky servo ports</h3><span class="tag" id="qkPinState"></span></div>
+        <p class="small muted" style="margin-top:0">The GPIO pins of the Quarky's servo ports are not filled in, because they could not be confirmed. Find them with the <b>servo port finder</b> sketch, then enter them here: they become <code>SERVO1_PIN</code> and <code>SERVO2_PIN</code> in the Quarky sketch. <b>−1</b> = not found yet.</p>
+        <div class="grid2">
+          <label class="field"><span>Servo 1 port · <code>SERVO1_PIN</code> (GPIO)</span><input type="number" min="-1" max="39" step="1" data-bind="quarky.pins.s1"></label>
+          <label class="field"><span>Servo 2 port · <code>SERVO2_PIN</code> (GPIO)</span><input type="number" min="-1" max="39" step="1" data-bind="quarky.pins.s2"></label>
+        </div>
+        <div id="qkPinMsgs" style="margin-top:10px;display:flex;flex-direction:column;gap:6px"></div>
+        <div class="qkmap"></div>
+        <div class="row" style="margin-top:12px">
+          <button class="btn sm qkFinderDl">Download servo port finder (.ino)</button>
+          <span class="grow"></span>
+          <button class="btn sm primary qkSketchDl">Download Quarky sketch (.ino)</button>
+        </div>
+      </div>
+      <div class="card only-pico">
         <div class="head"><h3>Pin assignments</h3><span class="tag" id="pinState"></span></div>
         <div class="tablewrap"><table id="pinTable"></table></div>
         <div id="pinMsgs" style="margin-top:10px;display:flex;flex-direction:column;gap:6px"></div>
@@ -575,17 +615,19 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
           <button class="btn sm primary" id="pinApply">Send to Pico</button>
         </div>
       </div>
-      <div class="card">
+      <div class="card only-pico">
         <div class="head"><h3>Pico H pinout</h3><span class="small muted">top view, USB at the top</span></div>
         <svg class="pinout" id="pinout" viewBox="0 0 520 330"></svg>
       </div>
       <div class="card small">
         <div class="head"><h3>Wiring notes</h3></div>
         <ul style="margin:0;padding-left:18px">
-          <li>Power the four MG90S from a separate 5 V supply (≥ 3 A; each can draw ~0.7 A when stalled). Never from the Pico's 3V3 pin, and not from USB.</li>
-          <li>Connect the servo supply ground to a Pico <b>GND</b> pin — the signal needs a common ground.</li>
-          <li>GP23, GP24, GP25 and GP29 aren't on the Pico H's pins: the board uses them inside (power supply, USB sense, the green LED and the VSYS reading).</li>
-          <li>GPn and GPn+16 share one PWM output (e.g. GP0 &amp; GP16), so two servos can't use both.</li>
+          <li class="only-pico">Power the four MG90S from a separate 5 V supply (≥ 3 A; each can draw ~0.7 A when stalled). Never from the Pico's 3V3 pin, and not from USB.</li>
+          <li class="only-pico">Connect the servo supply ground to a Pico <b>GND</b> pin — the signal needs a common ground.</li>
+          <li class="only-pico">GP23, GP24, GP25 and GP29 aren't on the Pico H's pins: the board uses them inside (power supply, USB sense, the green LED and the VSYS reading).</li>
+          <li class="only-pico">GPn and GPn+16 share one PWM output (e.g. GP0 &amp; GP16), so two servos can't use both.</li>
+          <li class="only-quarky"><b>Quarky:</b> its servo port can supply only about <b>1 A</b> — less than two MG90S can draw when they start or stall. Power the servos from a <b>separate 5 V supply</b> (≥ 2 A) and connect its ground to the Quarky's <b>GND</b> (shared ground); take only the signal wire from the servo port.</li>
+          <li class="only-quarky">Only two servos are connected at a time: <b>G</b> mode drives gripper + base, <b>E</b> mode shoulder + elbow. The joints without a servo are unpowered and can sag under load.</li>
           <li>Servo wires: <b>orange/yellow</b> = signal (to the GPIO above), <b>red</b> = +5 V (servo supply), <b>brown/black</b> = ground.</li>
         </ul>
       </div>
@@ -593,6 +635,25 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
 
     <!-- ================= SETTINGS ================= -->
     <div class="panel" id="tab-settings">
+      <div class="card">
+        <div class="head"><h3>Hardware</h3></div>
+        <div class="seg" id="hwSeg"><button data-hw-pick="pico">Raspberry Pi Pico H (4 servos)</button><button data-hw-pick="quarky">Quarky (2 servos)</button></div>
+        <p class="small muted only-quarky" style="margin-bottom:0">STEMpedia Quarky (ESP32) without an expansion board: two servo ports. <kbd>G</kbd> drives gripper + base, <kbd>E</kbd> shoulder + elbow. Calibration stays with each joint, whichever port it is on.</p>
+      </div>
+      <div class="card only-quarky">
+        <div class="head"><h3>Quarky firmware (Arduino sketch)</h3><span class="tag fwTag"></span></div>
+        <ol class="small" style="margin:6px 0;padding-left:18px">
+          <li>Arduino IDE: install the <b>esp32</b> board package (Boards Manager) and the <b>ESP32Servo</b> library (Library Manager).</li>
+          <li>Find the GPIO pins of the two servo ports with the <b>servo port finder</b> and enter them in the <b>Pins</b> tab.</li>
+          <li>Download the Quarky sketch (your pins, limits and safety settings are built in), upload it to the Quarky, close the Serial Monitor and click <b>Connect USB</b>.</li>
+        </ol>
+        <div class="row">
+          <button class="btn sm primary qkSketchDl">Download Quarky sketch (.ino)</button>
+          <button class="btn sm qkFinderDl">Download servo port finder (.ino)</button>
+          <button class="btn sm ghost" data-dl-main>Download main.py</button>
+        </div>
+        <p class="small muted" id="qkSketchNote"></p>
+      </div>
       <div class="card">
         <div class="head"><h3>Appearance</h3></div>
         <div class="seg" id="themeSeg">
@@ -618,8 +679,8 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
         <div class="row" style="margin-top:8px"><button class="btn sm" id="portAdd">Add a port…</button>
           <span class="small muted grow">The browser's port picker shows the COM / tty name (e.g. COM3). Web pages can't read that name, so ports here are listed by their USB vendor:product ID.</span></div>
       </div>
-      <div class="card">
-        <div class="head"><h3>Pico firmware (MicroPython)</h3><span class="tag" id="fwTag"></span></div>
+      <div class="card only-pico">
+        <div class="head"><h3>Pico firmware (MicroPython)</h3><span class="tag fwTag" id="fwTag"></span></div>
         <p class="small muted">The Pico runs MicroPython plus the ArmCtl <code>main.py</code>. This page copies <code>main.py</code> onto the Pico by itself over USB — no Thonny needed. Your current pins and limits are built into it. Made for the Raspberry Pi Pico H (a plain Pico works the same way).</p>
         <ol class="small" style="margin:6px 0;padding-left:18px">
           <li><b>Once:</b> install MicroPython. Hold the Pico's <b>BOOTSEL</b> button while plugging it in; it shows up as a drive called RPI-RP2. Copy the MicroPython <code>.uf2</code> file onto it (from <a href="https://micropython.org/download/RPI_PICO/" target="_blank" rel="noopener">micropython.org</a>; pick the <b>RPI_PICO</b> file, not RPI_PICO_W). The Pico restarts by itself.</li>
@@ -634,7 +695,7 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
         <details class="small">
           <summary>Copy main.py yourself instead (Thonny)</summary>
           <p style="margin:6px 0">Download <code>main.py</code>, open it in Thonny and save it onto the Pico as <code>main.py</code>. Delete <code>arm_cfg.json</code> on the Pico if it's there, so the new settings apply. Then close Thonny and click <b>Connect USB</b>.</p>
-          <div class="row end"><button class="btn sm" id="fwDownload">Download main.py</button></div>
+          <div class="row end"><button class="btn sm" id="fwDownload">Download main.py</button><button class="btn sm qkSketchDl">Download Quarky sketch (.ino)</button></div>
         </details>
         <p class="small muted">The 3D view loads three.js from the internet; without internet the page falls back to a 2D schematic view.</p>
       </div>
@@ -657,7 +718,7 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
         <div class="row" style="margin-top:8px">
           <input type="text" id="rawCmd" class="grow mono" placeholder='{"t":"ping"}'>
           <button class="btn sm" id="rawSend">Send</button>
-          <button class="btn sm ghost" id="picoReset" title="Ctrl-C + Ctrl-D: restarts main.py on the Pico">Restart Pico</button>
+          <button class="btn sm ghost only-pico" id="picoReset" title="Ctrl-C + Ctrl-D: restarts main.py on the Pico">Restart Pico</button>
         </div>
       </div>
     </div>
@@ -665,6 +726,312 @@ details.servo .body { padding: 4px 12px 12px; display: flex; flex-direction: col
 </main>
 <div class="toast" id="toast"></div>
 
+<!-- Quarky (ESP32) Arduino sketch template (filled in by "Download Quarky sketch") -->
+<script type="text/plain" id="qkTemplate">
+// ArmCtl firmware for the STEMpedia Quarky (ESP32), 2 servo ports - generated by the ArmCtl page.
+// Speaks the same JSON-lines protocol over USB as the Pico's main.py (hello, cfg, pos, ping, ack, log, ...).
+//
+// Arduino IDE:
+//   1. Boards Manager: install "esp32" by Espressif. Tools > Board: "ESP32 Dev Module" (or the Quarky entry if you have one).
+//   2. Library Manager: install "ESP32Servo" (by Kevin Harrington / madhephaestus).
+//   3. Set SERVO1_PIN and SERVO2_PIN below (use the servo port finder sketch to find them), then Upload.
+//   4. Close the Serial Monitor, choose "Quarky (2 servos)" in the ArmCtl page (Settings) and click Connect USB.
+//
+// Which joints the two ports drive (G mode: gripper + base, E mode: shoulder + elbow) is chosen in the page.
+// Safety on the board itself: every pulse is clamped to the joint's calibrated range, each port is speed-limited
+// (a mode change or new limits never make a port jump), and the arm holds still if the commands stop.
+
+#include <ESP32Servo.h>
+#include <Preferences.h>
+
+// ---------------- Quarky servo port pins: SET THESE ----------------
+// GPIO numbers of the Quarky's two servo ports. They are not filled in for you because they could not be
+// confirmed: run the "servo port finder" sketch (ArmCtl page > Pins) to find them, or enter them in the Pins tab
+// and download this sketch again.
+#define SERVO1_PIN {{SERVO1_PIN}}
+#define SERVO2_PIN {{SERVO2_PIN}}
+
+#if SERVO1_PIN < 0 || SERVO2_PIN < 0
+#error "Set SERVO1_PIN and SERVO2_PIN at the top of this sketch (find them with the servo port finder sketch)."
+#endif
+
+#define FW "armctl-quarky-1.0"
+#define NCH 2
+const int PINS[NCH] = { SERVO1_PIN, SERVO2_PIN };
+
+struct Chan { int minUs, maxUs, slew; };      // pulse range (us) and speed limit (us per second)
+struct Config { uint32_t tag; uint32_t timeoutMs; Chan ch[NCH]; };
+// Settings from the page when this sketch was downloaded. Settings saved from the page replace them.
+Config cfg = {{CFG}};
+const uint32_t TAG = {{TAG}};                 // changes with these settings, so a new upload ignores old saved ones
+
+Servo servo[NCH];
+float cur[NCH];                               // pulse being output now (us)
+int tgt[NCH];                                 // pulse we're moving towards (us)
+bool attached[NCH];                           // false = no pulses (servo limp)
+bool estop = false, lost = false;
+unsigned long seen = 0, lastStep = 0;
+char line[512];
+size_t len = 0;
+bool overflow = false;
+Preferences prefs;
+
+// ---------------- servos ----------------
+int limitUs(int i, long v) {
+  if (v < cfg.ch[i].minUs) return cfg.ch[i].minUs;
+  if (v > cfg.ch[i].maxUs) return cfg.ch[i].maxUs;
+  return (int)v;
+}
+
+void setTargets(const long *us, int n) {
+  for (int i = 0; i < NCH && i < n; i++) {
+    if (us[i] <= 0) continue;
+    tgt[i] = limitUs(i, us[i]);
+    if (!attached[i]) {                       // first position after power-up or release: position unknown
+      cur[i] = tgt[i];
+      servo[i].setPeriodHertz(50);
+      servo[i].attach(PINS[i], 400, 2600);
+      servo[i].writeMicroseconds(tgt[i]);
+      attached[i] = true;
+    }
+  }
+}
+
+void hold() {                                 // stop where we are
+  for (int i = 0; i < NCH; i++) tgt[i] = (int)(cur[i] + 0.5f);
+}
+
+void release() {                              // no more pulses: the servos go limp
+  for (int i = 0; i < NCH; i++) if (attached[i]) { servo[i].detach(); attached[i] = false; }
+}
+
+void stepServos() {
+  unsigned long now = millis();
+  if (now - lastStep < 10) return;
+  float dt = (now - lastStep) / 1000.0f;
+  if (dt > 0.1f) dt = 0.1f;
+  lastStep = now;
+  // watchdog: the page went quiet (USB unplugged, page closed, computer asleep) -> stop where we are
+  if (seen && !lost && now - seen > cfg.timeoutMs) {
+    lost = true;
+    hold();
+    Serial.println("{\"t\":\"log\",\"msg\":\"no commands - holding position\"}");
+  }
+  for (int i = 0; i < NCH; i++) {
+    if (!attached[i]) continue;
+    float c = cur[i], t = tgt[i];
+    if (c == t) continue;
+    float step = cfg.ch[i].slew * dt;
+    cur[i] = fabsf(t - c) <= step ? t : c + (t > c ? step : -step);
+    servo[i].writeMicroseconds((int)(cur[i] + 0.5f));
+  }
+}
+
+// ---------------- settings in flash ----------------
+void saveConfig() {
+  prefs.begin("armctl", false);
+  cfg.tag = TAG;
+  prefs.putBytes("cfg", &cfg, sizeof cfg);
+  prefs.end();
+}
+
+void loadConfig() {
+  Config saved;
+  prefs.begin("armctl", true);
+  size_t n = prefs.getBytes("cfg", &saved, sizeof saved);
+  prefs.end();
+  if (n == sizeof saved && saved.tag == TAG) cfg = saved;
+}
+
+// ---------------- tiny JSON readers (the page always sends compact JSON) ----------------
+const char *field(const char *s, const char *key) {       // pointer to the value after "key":
+  char pat[24];
+  snprintf(pat, sizeof pat, "\"%s\":", key);
+  const char *p = strstr(s, pat);
+  return p ? p + strlen(pat) : nullptr;
+}
+bool str(const char *s, const char *key, char *out, size_t n) {
+  const char *p = field(s, key);
+  if (!p || *p != '"') return false;
+  p++;
+  size_t i = 0;
+  while (*p && *p != '"' && i + 1 < n) out[i++] = *p++;
+  out[i] = 0;
+  return true;
+}
+bool num(const char *s, const char *key, double &v) {
+  const char *p = field(s, key);
+  if (!p) return false;
+  char *e;
+  v = strtod(p, &e);
+  return e != p;
+}
+bool flag(const char *s, const char *key) {
+  const char *p = field(s, key);
+  return p && strncmp(p, "true", 4) == 0;
+}
+int numbers(const char *s, const char *key, long *out, int max) {   // "key":[1,2,null] -> count
+  const char *p = field(s, key);
+  if (!p || *p != '[') return 0;
+  p++;
+  int n = 0;
+  while (*p && *p != ']' && n < max) {
+    if (strncmp(p, "null", 4) == 0) { out[n++] = 0; p += 4; }
+    else { char *e; out[n++] = strtol(p, &e, 10); if (e == p) break; p = e; }
+    while (*p == ',' || *p == ' ') p++;
+  }
+  return n;
+}
+
+// ---------------- commands from the page ----------------
+void hello() {
+  Serial.printf("{\"t\":\"hello\",\"fw\":\"%s\",\"servos\":%d,\"pins\":[%d,%d]}\n", FW, NCH, SERVO1_PIN, SERVO2_PIN);
+}
+
+void applyCfg(const char *s) {
+  double v;
+  if (num(s, "timeout", v)) cfg.timeoutMs = constrain((long)v, 200L, 30000L);
+  const char *p = field(s, "servos");
+  for (int i = 0; p && i < NCH; i++) {                     // one object per servo port, in port order
+    const char *o = strchr(p, '{');
+    if (!o) break;
+    const char *end = strchr(o, '}');
+    if (!end) break;
+    char obj[160];
+    size_t n = min((size_t)(end - o + 1), sizeof obj - 1);
+    memcpy(obj, o, n); obj[n] = 0;
+    double mn, mx, sl;
+    if (num(obj, "min", mn) && num(obj, "max", mx) && num(obj, "slew", sl) && mn >= 400 && mx <= 2600 && mn < mx && sl > 0)
+      cfg.ch[i] = { (int)mn, (int)mx, (int)sl };
+    p = end + 1;
+  }
+  // New limits apply to the targets; the output then moves into range at the speed limit (no jump)
+  for (int i = 0; i < NCH; i++) if (attached[i]) tgt[i] = limitUs(i, tgt[i]);
+}
+
+void handle(const char *s) {
+  char t[12];
+  if (!str(s, "t", t, sizeof t)) return;
+  seen = millis();
+  if (!strcmp(t, "pos")) {
+    long us[NCH];
+    int n = numbers(s, "us", us, NCH);
+    lost = false;
+    if (!estop) setTargets(us, n);            // ignored until the page resets the E-STOP
+  } else if (!strcmp(t, "stop")) {            // E-STOP: freeze in place, or go limp
+    estop = true;
+    char mode[12] = "";
+    str(s, "mode", mode, sizeof mode);
+    if (!strcmp(mode, "release")) release(); else hold();
+  } else if (!strcmp(t, "resume")) {
+    estop = false;
+  } else if (!strcmp(t, "hold")) {
+    hold();
+  } else if (!strcmp(t, "off")) {
+    release();
+    estop = flag(s, "estop");
+  } else if (!strcmp(t, "cfg")) {
+    applyCfg(s);
+    bool save = flag(s, "save");
+    if (save) saveConfig();
+    Serial.printf("{\"t\":\"ack\",\"what\":\"cfg\",\"saved\":%s}\n", save ? "true" : "false");
+  } else if (!strcmp(t, "ping")) {
+    double id = 0;
+    num(s, "id", id);
+    Serial.printf("{\"t\":\"pong\",\"id\":%.0f}\n", id);
+  } else if (!strcmp(t, "hello")) {
+    hello();
+  } else {
+    Serial.println("{\"t\":\"log\",\"msg\":\"unknown command\"}");
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  ESP32PWM::allocateTimer(0);
+  ESP32PWM::allocateTimer(1);
+  loadConfig();
+  for (int i = 0; i < NCH; i++) { attached[i] = false; cur[i] = tgt[i] = 1500; }
+  hello();                                    // tells the page we (re)started, so it sends the settings again
+}
+
+void loop() {
+  while (Serial.available()) {
+    char ch = Serial.read();
+    if (ch == '\n') {
+      line[len] = 0;
+      if (len && !overflow) handle(line);
+      len = 0; overflow = false;
+    } else if (ch != '\r') {
+      if (len < sizeof line - 1) line[len++] = ch; else overflow = true;
+    }
+  }
+  stepServos();
+}
+</script>
+<!-- Quarky servo port finder sketch (filled in by "Download servo port finder") -->
+<script type="text/plain" id="qkFinder">
+// ArmCtl servo port finder for the STEMpedia Quarky (ESP32) - generated by the ArmCtl page.
+// Finds which GPIO each Quarky servo port is wired to.
+//
+//   1. Plug ONE servo into the Quarky servo port you want to identify (servo powered as usual).
+//   2. Install the ESP32 board package and the ESP32Servo library, upload this sketch, and open the
+//      Serial Monitor at 115200 baud.
+//   3. Each GPIO below is tried in turn for 4 seconds: the servo sweeps when its own pin is being driven.
+//      When it moves, read the GPIO number in the Serial Monitor. Type that number + Enter to test it again.
+//      Type s + Enter to stop, or n + Enter to go on to the next pin.
+//   4. Do the same with the other port. Enter both numbers in the ArmCtl page (Pins tab) and download the
+//      Quarky sketch.
+//
+// Skipped on purpose: GPIO 0 (boot button), 1 and 3 (USB serial), 6-11 (flash memory), 34-39 (input only).
+// Other parts of the Quarky (display, buzzer, LEDs, motor driver) may also react while their pin is driven: that
+// pin is then not a servo port.
+
+#include <ESP32Servo.h>
+
+const int CANDIDATES[] = { 2, 4, 5, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33 };
+const int COUNT = sizeof CANDIDATES / sizeof CANDIDATES[0];
+
+Servo servo;
+int idx = 0;
+bool stopped = false;
+
+void sweep(int pin) {
+  Serial.printf(">>> Now driving GPIO %d - does the servo move?\n", pin);
+  servo.setPeriodHertz(50);
+  servo.attach(pin, 500, 2500);
+  for (int k = 0; k < 4 && !Serial.available(); k++) {       // ~4 s: 1200 -> 1800 -> 1200 us
+    for (int us = 1200; us <= 1800 && !Serial.available(); us += 20) { servo.writeMicroseconds(us); delay(16); }
+    for (int us = 1800; us >= 1200 && !Serial.available(); us -= 20) { servo.writeMicroseconds(us); delay(16); }
+  }
+  servo.writeMicroseconds(1500);
+  delay(200);
+  servo.detach();
+  pinMode(pin, INPUT);
+  Serial.printf("    GPIO %d done\n", pin);
+}
+
+void setup() {
+  Serial.begin(115200);
+  ESP32PWM::allocateTimer(0);
+  delay(1500);
+  Serial.println("ArmCtl servo port finder. Watch the servo; note the GPIO number when it moves.");
+}
+
+void loop() {
+  if (Serial.available()) {
+    String in = Serial.readStringUntil('\n');
+    in.trim();
+    if (in == "s") { stopped = true; Serial.println("Stopped. Type a GPIO number to test it, or n to continue."); }
+    else if (in == "n") { stopped = false; }
+    else if (in.length() && isDigit(in[0])) { stopped = true; sweep(in.toInt()); Serial.println("Type another number, or n to continue the scan."); }
+  }
+  if (stopped) return;
+  sweep(CANDIDATES[idx]);
+  idx = (idx + 1) % COUNT;
+  if (idx == 0) Serial.println("--- all pins tried, starting again ---");
+}
+</script>
 <!-- MicroPython firmware template (filled in by "Download main.py") -->
 <script type="text/plain" id="fwTemplate">
 # ArmCtl firmware for Raspberry Pi Pico H (MicroPython 1.20 or newer)
@@ -897,7 +1264,7 @@ const round = (v, d = 0) => { const k = 10 ** d; return Math.round(v * k) / k; }
 const JOINTS = [
   { id: 'base',     name: 'Base',     keys: ['q', 'a'], unit: '°', servo: 'MG90S' },
   { id: 'shoulder', name: 'Shoulder', keys: ['w', 's'], unit: '°', servo: 'MG90S' },
-  { id: 'elbow',    name: 'Elbow',    keys: ['e', 'd'], unit: '°', servo: 'MG90S' },
+  { id: 'elbow',    name: 'Elbow',    keys: ['z', 'x'], unit: '°', servo: 'MG90S' },
   { id: 'gripper',  name: 'Gripper',  keys: ['r', 'f'], unit: '%', servo: 'MG90S' },
 ];
 // Order here = order of pulse widths in the "pos" packet sent to the Pico
@@ -908,22 +1275,34 @@ const SERVOS = [
   { id: 'gripper',  name: 'Gripper',  joint: 'gripper',  type: 'MG90S' },
 ];
 const PICO_PINS = [...Array(23).keys(), 26, 27, 28];
+// Quarky (ESP32) has two servo ports. A mode key chooses which two joints they drive.
+// Calibration stays with the joint (cfg.servos[joint]); only the port a joint is on changes.
+const QK_MAP = { G: ['gripper', 'base'], E: ['shoulder', 'elbow'] };
+const QK_MODE_NAME = m => QK_MAP[m].map(id => JOINTS.find(j => j.id === id).name).join(' + ');
+const quarky = () => cfg.hw === 'quarky';
+const channels = () => quarky() ? QK_MAP[cfg.quarky.mode] : SERVOS.map(s => s.id);   // joint on each servo output
+const mapped = id => !quarky() || QK_MAP[cfg.quarky.mode].includes(id);
+const frozen = id => quarky() && live() && !mapped(id);       // no servo: the joint keeps its last angle
 // Built-in examples. Pick & place uses straight-line (IK) moves to go down to and up from the table.
+const E_DEMO = { name: 'Reach and fold', loop: false, hw: 'E', keys: [     // shoulder + elbow only
+  [0, 0, 0], [1.2, 40, -20], [2.2, 40, 40], [3.4, -20, 70], [4.6, 0, 0]].map(([t, shoulder, elbow]) =>
+  ({ t, q: { base: 0, shoulder, elbow, gripper: 50 }, move: 'joint', ease: 'smooth' })) };
 const DEMO_ANIMS = (() => {
   const k = (t, base, shoulder, elbow, gripper, move = 'joint', ease = 'smooth') => ({ t, q: { base, shoulder, elbow, gripper }, move, ease });
   const A = [-14.8, 40.2, -3.7], Ad = [-14.8, 55.8, 2], B = [29.5, 40.4, -3.4], Bd = [29.5, 55.8, 2];   // above / down at (135, ∓55) mm
   return [
-    { name: 'Pick and place', loop: false, keys: [
+    { name: 'Pick and place', loop: false, hw: 'G', keys: [
       k(0, 0, 0, 0, 50), k(1.5, ...A, 100), k(2.7, ...Ad, 100, 'line'), k(3.4, ...Ad, 0), k(4.6, ...A, 0, 'line'),
       k(6.2, ...B, 0), k(7.4, ...Bd, 0, 'line'), k(8.1, ...Bd, 100), k(9.3, ...B, 100, 'line'), k(11, 0, 0, 0, 50)] },
-    { name: 'Wave', loop: true, keys: [
+    { name: 'Wave', loop: true, hw: 'G', keys: [
       k(0, 0, 0, 0, 50), k(1, 0, -10, 70, 50), k(1.6, 30, -10, 70, 100), k(2.2, -30, -10, 70, 0),
       k(2.8, 30, -10, 70, 100), k(3.4, -30, -10, 70, 0), k(4.2, 0, -10, 70, 50), k(5.4, 0, 0, 0, 50)] },
+    E_DEMO,
   ];
 })();
 const servoDefaults = (pin, type, extra = {}) => ({ pin, type, center: 90, invert: false, minAngle: 0, maxAngle: 180, minUs: 500, maxUs: 2500, range: 180, ...extra });
 const DEFAULT_CFG = {
-  version: 7,
+  version: 8,
   theme: 'auto',
   mode: 'sim',
   speed: 50,
@@ -940,6 +1319,8 @@ const DEFAULT_CFG = {
     gripper:  servoDefaults(6, 'MG90S', { closedAngle: 40, openAngle: 130 }),
   },
   typeSpeed: { MG90S: 400 },
+  hw: 'pico',                                          // 'pico' (4 servos) or 'quarky' (2 servo ports)
+  quarky: { mode: 'G', pins: { s1: -1, s2: -1 } },     // pins unknown until found with the servo port finder
   conn: { rate: 30, autoReconnect: true, port: '' },   // port: 'VID:PID#n' of the chosen USB port
   view: { grid: true, envelope: true, axes: false, shadows: true, ikMarker: true, trail: false, animPath: true },
   sim: { realistic: true, ghost: false, tolerance: 12, poseTol: 8 },
@@ -977,6 +1358,10 @@ function loadCfg(saved) {
     if (saved.conn) saved.conn.port = '';
   }
   if (v < 7) delete saved.led;                   // v7: NeoPixel support removed
+  if (v < 8 && Array.isArray(saved.anims)) {     // v8: each animation has a Quarky hardware mode
+    for (const a of saved.anims) a.hw ||= 'G';
+    if (!saved.anims.some(a => a.name === E_DEMO.name)) saved.anims.push(structuredClone(E_DEMO));
+  }
   delete saved.version;
   return merge(DEFAULT_CFG, saved);
 }
@@ -1181,14 +1566,29 @@ function servoAngle(sid, jointValue) {
   return clamp(a, s.minAngle, s.maxAngle);
 }
 const angleToUs = (sid, a) => { const s = cfg.servos[sid]; return Math.round(s.minUs + (a / s.range) * (s.maxUs - s.minUs)); };
-function pulses() {
-  return SERVOS.map(sv => angleToUs(sv.id, sv.id in state.overrides ? state.overrides[sv.id] : servoAngle(sv.id, state.current[sv.joint])));
+const jointUs = id => angleToUs(id, id in state.overrides ? state.overrides[id] : servoAngle(id, state.current[id]));
+function pulses() { return channels().map(jointUs); }
+// Quarky: what each servo port was last sent. Every send moves at most one step at the servo speed, so a mode
+// change (or anything else) never makes a port jump; during a hand-over the step uses the speed slider.
+const chan = { us: null, t: 0, handover: false };
+function rampChannels(want, now) {
+  const dt = chan.t ? Math.min(0.2, (now - chan.t) / 1000) : 0; chan.t = now;
+  if (!chan.us || chan.us.length !== want.length) { chan.handover = false; return (chan.us = want.slice()); }
+  const ids = channels(), degPerS = cfg.typeSpeed.MG90S * (chan.handover ? cfg.speed / 100 : 1);
+  chan.us = want.map((w, i) => {
+    const sv = cfg.servos[ids[i]], step = degPerS * Math.abs(sv.maxUs - sv.minUs) / sv.range * dt, c = chan.us[i];
+    return Math.round(Math.abs(w - c) <= step ? w : c + Math.sign(w - c) * step);
+  });
+  if (chan.handover && chan.us.every((u, i) => Math.abs(u - want[i]) <= 1)) { chan.handover = false; log('Mode change finished — the servos are on their new joints', 'rx'); }
+  return chan.us;
 }
+const handoverBusy = () => quarky() && live() && link.connected && chan.handover;
 
 /* =====================================================================
    Connection: USB (Web Serial) to MicroPython main.py, one JSON message per line
    ===================================================================== */
 const PICO_VID = 0x2e8a;                       // Raspberry Pi (RP2040) USB vendor id
+const USB_SERIAL_CHIPS = { 0x1a86: 'CH340', 0x10c4: 'CP210x', 0x0403: 'FTDI', 0x303a: 'ESP32 USB' };   // ESP32 boards use one of these
 let flashing = false;          // main.py is being copied to the Pico (Settings)
 const link = {
   port: null, reader: null, writer: null, connected: false, connecting: false,
@@ -1228,10 +1628,13 @@ const link = {
   },
   onOpen() {
     this.connected = true; this.connecting = false; this.lastPong = performance.now(); this.lastSent = ''; this.silentWarned = false;
-    log('Connected over USB', 'rx'); toast('Connected to the Pico');
+    log('Connected over USB', 'rx'); toast(quarky() ? 'Connected to the Quarky' : 'Connected to the Pico');
+    this.cfgAcked = false; this.fw = ''; chan.us = null; chan.handover = false;
     this.raw('\r\n');
     this.send({ t: 'hello' });
     this.send(cfgPacket(false));
+    // An ESP32 often restarts when its port opens and misses these: ask again once it has booted
+    if (quarky()) setTimeout(() => { if (this.connected && !this.fw) { this.send({ t: 'hello' }); this.send(cfgPacket(false)); } }, 2500);
     updateConn(); renderPorts();
   },
   async close(byUser = true) {
@@ -1264,9 +1667,14 @@ const link = {
     }
     if (m.t === 'pong') { this.lastPong = performance.now(); this.rtt = Math.round(performance.now() - (m.id || 0)); this.silentWarned = false; updateConn(); return; }
     if (m.t === 'probe') { onProbe(m); log('← ' + line, 'rx'); return; }
+    if (m.t === 'ack' && m.what === 'cfg') this.cfgAcked = true;
     if (m.t === 'hello') {
       this.fw = m.fw || ''; renderSafety(); renderFwTag(); renderTest();
-      if (this.fw < FW_SAFE) safetyEvent('The Pico runs an old main.py without the Pico-side limits — click “Upload to Pico” in Settings.', true);
+      if (quarky() !== isQuarkyFw(this.fw)) safetyEvent(quarky() ? 'The board isn’t running the Quarky sketch — upload it (Settings), or choose the Pico profile.' : 'This is the Quarky sketch, but the Pico profile is selected — choose Quarky in Settings.', true);
+      else if (!fwSafe(this.fw)) safetyEvent('The Pico runs an old main.py without the Pico-side limits — click “Upload to Pico” in Settings.', true);
+      if (quarky() && Array.isArray(m.pins) && ['s1', 's2'].some((k, i) => +cfg.quarky.pins[k] >= 0 && +m.pins[i] !== +cfg.quarky.pins[k]))
+        safetyEvent(`The Quarky sketch uses GPIO ${m.pins.join(' / ')}, but the Pins tab says ${cfg.quarky.pins.s1} / ${cfg.quarky.pins.s2}. Download the sketch again.`, true);
+      if (quarky() && !this.cfgAcked) this.send(cfgPacket(false));   // the ESP32 may have restarted when the port opened
     }
     log('← ' + line, 'rx');
   },
@@ -1288,7 +1696,7 @@ const hex4 = v => v == null ? '----' : v.toString(16).toUpperCase().padStart(4, 
 const portKey = p => ports.keys[ports.list.indexOf(p)] || '';
 function portName(p) {
   const v = p.getInfo().usbVendorId, [id, n] = portKey(p).split('#');
-  const name = v === PICO_VID ? 'Raspberry Pi Pico' : v != null ? 'USB serial device' : 'Serial port';
+  const name = v === PICO_VID ? 'Raspberry Pi Pico' : USB_SERIAL_CHIPS[v] ? `Quarky / ESP32 (${USB_SERIAL_CHIPS[v]})` : v != null ? 'USB serial device' : 'Serial port';
   return `${name}${v != null ? ` (${id})` : ''}${+n > 1 ? ` #${n}` : ''}`;
 }
 // The saved port if it is plugged in, otherwise the only available port
@@ -1338,10 +1746,11 @@ const live = () => cfg.mode === 'live';
 function cfgPacket(save) {
   return {
     t: 'cfg', save: !!save,
-    // Pico-side safety: pulse range from the calibrated min/max angle, speed limit in µs per second
-    servos: SERVOS.map(s => {
-      const c = cfg.servos[s.id], a = [angleToUs(s.id, +c.minAngle), angleToUs(s.id, +c.maxAngle)];
-      return { id: s.id, pin: +c.pin, freq: 50, min: Math.min(...a), max: Math.max(...a), slew: Math.round(+cfg.safety.fwSlew * Math.abs(c.maxUs - c.minUs) / c.range) };
+    // Board-side safety: pulse range from the calibrated min/max angle, speed limit in µs per second.
+    // One entry per servo output; on the Quarky the limits are those of the joint now on that port.
+    servos: channels().map((id, i) => {
+      const c = cfg.servos[id], a = [angleToUs(id, +c.minAngle), angleToUs(id, +c.maxAngle)];
+      return { id, pin: quarky() ? +cfg.quarky.pins['s' + (i + 1)] : +c.pin, freq: 50, min: Math.min(...a), max: Math.max(...a), slew: Math.round(+cfg.safety.fwSlew * Math.abs(c.maxUs - c.minUs) / c.range) };
     }),
     timeout: Math.round(+cfg.safety.timeout * 1000),
   };
@@ -1367,7 +1776,7 @@ setInterval(() => {
 function sendPositions(now) {
   if (!live() || !link.connected || state.estop) return;
   if (now - link.lastSendT < 1000 / clamp(+cfg.conn.rate || 30, 5, 60)) return;
-  const us = pulses(); const key = us.join(',');
+  const us = quarky() ? rampChannels(pulses(), now) : pulses(); const key = us.join(',');
   if (key === link.lastSent && now - link.lastSendT < 1000) return;   // resend once a second as a heartbeat
   link.lastSent = key; link.lastSendT = now;
   link.send({ t: 'pos', us });
@@ -1377,13 +1786,14 @@ function sendPositions(now) {
    Motion
    ===================================================================== */
 function setJoint(id, v, from = 'ui') {
+  if (frozen(id)) return;
   const L = cfg.joints[id];
   state.target[id] = clamp(Number(v) || 0, L.min, L.max);
   if (from !== 'anim') stopAnim();
   onTargetChanged(from);
 }
 function setPose(q, from = 'ui') {
-  for (const j of JOINTS) if (q[j.id] != null) state.target[j.id] = clamp(q[j.id], cfg.joints[j.id].min, cfg.joints[j.id].max);
+  for (const j of JOINTS) if (q[j.id] != null && !frozen(j.id)) state.target[j.id] = clamp(q[j.id], cfg.joints[j.id].min, cfg.joints[j.id].max);
   if (from !== 'anim') stopAnim();
   onTargetChanged(from);
 }
@@ -1406,6 +1816,7 @@ function buildJointRows() {
       row.innerHTML = `
         <div class="jhead"><span class="jname">${j.name}</span><span class="jtype">${j.servo}</span>
           <span class="jnow" data-now></span><span class="jlim">${L.min}…${L.max}${j.unit}</span></div>
+        <div class="jnote" data-note></div>
         <div class="jctl">
           <button class="btn icon" data-d="-1" title="−1 (Shift: −10)">−</button>
           <input type="range" min="${L.min}" max="${L.max}" step="1" aria-label="${j.name}">
@@ -1425,6 +1836,10 @@ function refreshJointUI() {
   for (const row of $$('.jointRows .jrow')) {
     const id = row.dataset.joint, v = round(state.target[id]);
     const rng = $('input[type=range]', row), num = $('input[type=number]', row);
+    const off = !mapped(id), fz = frozen(id);
+    row.classList.toggle('nosvc', off);
+    $('[data-note]', row).textContent = off ? (fz ? `No servo in ${cfg.quarky.mode} mode — unpowered, holds its last angle.` : `No servo in ${cfg.quarky.mode} mode — moves in the simulator only.`) : '';
+    for (const el of $$('input, button', row)) el.disabled = fz;
     if (+rng.value !== v) rng.value = v;
     if (document.activeElement !== num) num.value = v;
   }
@@ -1527,6 +1942,9 @@ const curAnim = () => { if (!cfg.anims.length) cfg.anims.push({ name: 'Animation
 const animDur = a => a.keys.length ? a.keys[a.keys.length - 1].t : 0;
 const easeFn = (u, e) => e === 'linear' ? u : u * u * (3 - 2 * u);
 const JOINT_COLORS = { base: '#2f7cf6', shoulder: '#f26b1d', elbow: '#1f9d55', gripper: '#a855f7' };
+const animHw = a => QK_MAP[a.hw] ? a.hw : 'G';
+const animSent = (a, id) => !quarky() || QK_MAP[animHw(a)].includes(id);        // sent to the Quarky when played live
+const animJoints = a => JOINTS.filter(j => !(quarky() && live()) || animSent(a, j.id));   // checked for speed
 
 // Pose at time t. Returns { q, err } where err is the IK error (mm) of a straight-line segment.
 function animPose(a, t) {
@@ -1551,7 +1969,8 @@ function animPose(a, t) {
 }
 // Sampled curves, tool path and per-segment checks (servo speed, straight-line reachability). Rebuilt when keys change.
 function animInfo() {
-  const a = curAnim(), sig = JSON.stringify(a.keys) + cfg.typeSpeed.MG90S + JSON.stringify(cfg.joints) + JSON.stringify(cfg.safety);
+  const a = curAnim(), sig = JSON.stringify(a.keys) + cfg.typeSpeed.MG90S + JSON.stringify(cfg.joints) + JSON.stringify(cfg.safety) + cfg.hw + cfg.mode + animHw(a);
+  const checked = animJoints(a);
   if (anim.cache && anim.cache.sig === sig) return anim.cache;
   const K = a.keys, samples = [], seg = K.map(() => ({ speed: 0, err: 0, hit: '' })), dur = animDur(a), dt = 0.04;
   let prev = null;
@@ -1561,7 +1980,7 @@ function animInfo() {
     if (K.length > 1) {
       seg[si].err = Math.max(seg[si].err, r.err);
       if (!seg[si].hit && collides(r.q)) seg[si].hit = collision(r.q).what.replace(/^the (.*) would hit/, '$1 hits');
-      if (prev && t > prev.t) for (const j of JOINTS)
+      if (prev && t > prev.t) for (const j of checked)
         seg[si].speed = Math.max(seg[si].speed, Math.abs(r.q[j.id] - prev.q[j.id]) / (t - prev.t) / servoSpeed(j.id));
     }
     prev = { t, q: r.q };
@@ -1595,6 +2014,11 @@ function playAnim() {
     animStatus('Safety: fix the red parts of the timeline before playing on the real arm (you can still play it in the Simulator).', 'err');
     safetyEvent(`Blocked live playback of “${a.name}”: it has red segments`); return;
   }
+  if (live() && quarky() && animHw(a) !== cfg.quarky.mode) {
+    const m = animHw(a);
+    if (!confirm(`“${a.name}” is ${m === 'E' ? 'an' : 'a'} ${m}-mode animation (${QK_MODE_NAME(m)}), but the Quarky is in ${cfg.quarky.mode} mode.\n\nSwitch to ${m} mode and play? The servos hold still, then move to the first keyframe at the speed limit.`)) return;
+    stopRec(); qkHandover(m);
+  }
   stopRec(); prac.stop(false);
   if (anim.t >= animDur(a) - 1e-6) anim.t = 0;
   anim.playing = true; anim.phase = 'approach';
@@ -1612,7 +2036,7 @@ function stepAnim(dt) {
   const a = curAnim(), dur = animDur(a);
   if (a.keys.length < 2) { stopAnim(true); return; }      // keyframes were deleted while playing
   if (anim.phase === 'approach') {           // let the servos reach the pose before the clock runs
-    if (JOINTS.some(j => Math.abs(state.current[j.id] - state.target[j.id]) > 1)) return;
+    if (JOINTS.some(j => Math.abs(state.current[j.id] - state.target[j.id]) > 1) || handoverBusy()) return;
     anim.phase = 'run'; animStatus(live() ? 'Playing on the arm (USB)' : 'Playing in the simulator', 'ok');
   }
   anim.t += dt * +$('#animSpeed').value;
@@ -1625,6 +2049,11 @@ function stepAnim(dt) {
 // Recording: samples the arm 4× a second and keeps a keyframe whenever it moved
 function startRec() {
   if (anim.rec) return;
+  const a = curAnim();
+  if (quarky() && animHw(a) !== cfg.quarky.mode) {
+    if (a.keys.length && !confirm(`“${a.name}” is ${animHw(a) === 'E' ? 'an' : 'a'} ${animHw(a)}-mode animation. Record in ${cfg.quarky.mode} mode and make it a ${cfg.quarky.mode}-mode animation?`)) return;
+    a.hw = cfg.quarky.mode; saveCfg(); renderAnimUI();
+  }
   stopAnim();
   anim.rec = { t0: performance.now(), base: nextKeyTime(), last: 0, prevQ: null, prevT: 0, still: false };
   animStatus('Recording — move the arm with the sliders, keyboard or the blue ball. Press Record again to stop.', 'err');
@@ -1638,6 +2067,10 @@ function stepRec(now) {
   const r = anim.rec; if (!r || now - r.last < 250) return;
   r.last = now;
   const t = r.base + (now - r.t0) / 1000, q = snap(state.current);
+  if (quarky()) {                     // only the two joints with a servo are recorded; the others keep their last keyframe angles
+    const K = curAnim().keys, last = r.prevQ || (K.length ? K[K.length - 1].q : null);
+    if (last) for (const j of JOINTS) if (!mapped(j.id)) q[j.id] = last[j.id];
+  }
   const moved = !r.prevQ || JOINTS.some(j => Math.abs(q[j.id] - r.prevQ[j.id]) > 0.8);
   if (moved) {
     if (r.still) addKey(r.prevT, r.prevQ, { ease: 'linear' });     // the arm was holding still until here
@@ -1650,6 +2083,9 @@ function renderAnimUI() {
   const a = curAnim();
   $('#animSel').innerHTML = cfg.anims.map((x, i) => `<option value="${i}"${i === cfg.animSel ? ' selected' : ''}>${esc(x.name)}</option>`).join('');
   $('#animLoop').checked = !!a.loop;
+  $$('[data-anim-hw]').forEach(b => { b.classList.toggle('on', b.dataset.animHw === animHw(a)); b.disabled = anim.playing || !!anim.rec; });
+  $('#animHwNote').textContent = quarky() ? (live() ? `Live: sends ${QK_MODE_NAME(animHw(a)).toLowerCase()} only` : 'Simulator: plays all four joints') : '';
+  renderLegend();
   const info = animInfo();
   $('#animInfo').textContent = `${a.keys.length} keys · ${animDur(a).toFixed(1)} s`;
   const kl = $('#keyList');
@@ -1685,6 +2121,7 @@ function renderAnimUI() {
   renderTransport();
 }
 function renderTransport() {
+  renderQk();
   $('#animPlay').textContent = anim.playing ? '❚❚ Pause' : '▶ Play';
   $('#animRec').classList.toggle('on', !!anim.rec);
   $('#animRec').textContent = anim.rec ? '● Recording' : '● Record';
@@ -1714,10 +2151,12 @@ function drawTimeline() {
     c.fillStyle = 'rgba(224,62,62,.16)'; c.fillRect(g.x(K[i - 1].t), g.top, g.x(K[i].t) - g.x(K[i - 1].t), g.bot - g.top);
   }
   const h = g.bot - g.top - 8;
-  for (const j of JOINTS) {
-    const L = cfg.joints[j.id]; c.strokeStyle = JOINT_COLORS[j.id]; c.lineWidth = 1.6; c.beginPath();
+  for (const j of [...JOINTS].sort((x, y) => animSent(a, x.id) - animSent(a, y.id))) {
+    const L = cfg.joints[j.id], on = animSent(a, j.id);
+    c.strokeStyle = on ? JOINT_COLORS[j.id] : muted; c.globalAlpha = on ? 1 : 0.45; c.setLineDash(on ? [] : [4, 3]);
+    c.lineWidth = 1.6; c.beginPath();
     info.samples.forEach((sm, i) => { const y = g.bot - 4 - (sm.q[j.id] - L.min) / (L.max - L.min) * h; i ? c.lineTo(g.x(sm.t), y) : c.moveTo(g.x(sm.t), y); });
-    c.stroke();
+    c.stroke(); c.globalAlpha = 1; c.setLineDash([]);
   }
   K.forEach((k, i) => {
     const x = g.x(k.t), y = 11;
@@ -1728,10 +2167,15 @@ function drawTimeline() {
   const px = g.x(anim.t);
   c.strokeStyle = anim.rec ? cssVar('--danger') : cssVar('--text'); c.lineWidth = 2; c.beginPath(); c.moveTo(px, g.top - 4); c.lineTo(px, g.bot); c.stroke();
 }
+function renderLegend() {
+  const a = curAnim();
+  $('#legend').innerHTML = JOINTS.map(j => animSent(a, j.id) ? `<span><i style="background:${JOINT_COLORS[j.id]}"></i>${j.name}</span>`
+    : `<span class="muted" title="No servo in ${animHw(a)} mode: not sent to the Quarky"><i style="background:${cssVar('--muted')};opacity:.5"></i>${j.name} (no servo)</span>`).join('') +
+    '<span>◆ keyframe (blue outline = straight line)</span>';
+}
 function setupTimeline() {
   const cv = $('#timeline');
-  $('#legend').innerHTML = JOINTS.map(j => `<span><i style="background:${JOINT_COLORS[j.id]}"></i>${j.name}</span>`).join('') +
-    '<span>◆ keyframe (blue outline = straight line)</span>';
+
   const scrub = t => { anim.t = clamp(t, 0, animDur(curAnim())); const p = animPose(curAnim(), anim.t); if (p) setPose(p.q, 'anim'); renderTransport(); };
   cv.addEventListener('pointerdown', e => {
     const g = tlGeom(), x = e.clientX - g.r.left, y = e.clientY - g.r.top, K = curAnim().keys;
@@ -1765,9 +2209,13 @@ function updateAnimPath() {
 function setupAnimEvents() {
   setupTimeline();
   $('#animSel').addEventListener('change', e => { stopAnim(true); stopRec(); cfg.animSel = +e.target.value; anim.sel = -1; saveCfg(); renderAnimUI(); updateAnimPath(); });
-  const named = (name, keys = []) => { stopAnim(true); stopRec(); cfg.anims.push({ name, loop: false, keys }); cfg.animSel = cfg.anims.length - 1; anim.sel = -1; anim.t = 0; animChanged(); };
+  const named = (name, keys = [], hw = cfg.quarky.mode) => { stopAnim(true); stopRec(); cfg.anims.push({ name, loop: false, hw, keys }); cfg.animSel = cfg.anims.length - 1; anim.sel = -1; anim.t = 0; animChanged(); };
   $('#animNew').addEventListener('click', () => { const n = prompt('Name of the new animation', `Animation ${cfg.anims.length + 1}`); if (n) named(n.trim() || 'Animation'); });
-  $('#animDup').addEventListener('click', () => { const a = curAnim(); named(a.name + ' copy', structuredClone(a.keys)); });
+  $('#animDup').addEventListener('click', () => { const a = curAnim(); named(a.name + ' copy', structuredClone(a.keys), animHw(a)); });
+  $('#animHwSeg').addEventListener('click', e => {
+    const b = e.target.closest('[data-anim-hw]'); if (!b || anim.playing || anim.rec) return;
+    curAnim().hw = b.dataset.animHw; saveCfg(); renderAnimUI();
+  });
   $('#animRename').addEventListener('click', () => { const a = curAnim(), n = prompt('Rename animation', a.name); if (n && n.trim()) { a.name = n.trim(); saveCfg(); renderAnimUI(); } });
   $('#animDel').addEventListener('click', () => {
     const a = curAnim(); if (!confirm(`Delete “${a.name}”?`)) return;
@@ -1788,7 +2236,9 @@ function setupAnimEvents() {
       if (!Array.isArray(d.keys)) throw new Error('no keyframes in this file');
       const keys = d.keys.map(k => ({ t: +k.t || 0, move: k.move === 'line' ? 'line' : 'joint', ease: k.ease === 'linear' ? 'linear' : 'smooth',
         q: Object.fromEntries(JOINTS.map(j => [j.id, clamp(+k.q?.[j.id] || 0, cfg.joints[j.id].min, cfg.joints[j.id].max)])) }));
-      named(String(d.name || f.name.replace(/\.json$/, '')), keys); toast('Animation imported');
+      named(String(d.name || f.name.replace(/\.json$/, '')), keys, QK_MAP[d.hw] ? d.hw : cfg.quarky.mode);
+      if (d.loop) { curAnim().loop = true; saveCfg(); renderAnimUI(); }
+      toast('Animation imported');
     } catch (err) { toast('Could not import: ' + err.message); }
   });
 }
@@ -1823,8 +2273,49 @@ function setMode(m) {
   renderMode();
   toast(m === 'live' ? 'LIVE mode — commands go to the arm' : 'Simulator mode — the arm is not driven');
 }
+// Quarky: change which joints the two servo ports drive.
+// Hand-over: the ports first hold their current pulses, the joints that lose their servo stop where they are,
+// the Quarky gets the new joints' limits, then each port moves to its new joint's angle at the speed limit.
+function setQkMode(m) {
+  if (!quarky() || !QK_MAP[m]) return false;
+  if (anim.playing || anim.rec) { toast('Stop the animation to change mode'); return false; }
+  if (m === cfg.quarky.mode) return true;
+  qkHandover(m);
+  return true;
+}
+function qkHandover(m) {
+  const real = live() && link.connected;
+  if (real) link.send({ t: 'hold' });
+  for (const id of QK_MAP[cfg.quarky.mode]) { state.target[id] = state.current[id]; state.vel[id] = 0; }
+  cfg.quarky.mode = m; saveCfg();
+  state.overrides = {};
+  if (real) { chan.handover = !!chan.us; link.send(cfgPacket(false)); link.lastSent = ''; }
+  log(`Quarky ${m} mode: servo 1 → ${QK_MAP[m][0]}, servo 2 → ${QK_MAP[m][1]}`, 'rx');
+  toast(`${m} mode — ${QK_MODE_NAME(m)}`);
+  renderQk(); refreshJointUI(); syncIkFromTarget(); renderAnimUI();
+}
+function renderQk() {
+  document.body.dataset.hw = cfg.hw;
+  $('#hwSub').textContent = quarky() ? '4-axis arm · 2× MG90S · STEMpedia Quarky' : '4-axis arm · 4× MG90S · Raspberry Pi Pico H';
+  $$('[data-hw-pick]').forEach(b => b.classList.toggle('on', b.dataset.hwPick === cfg.hw));
+  if (!quarky()) return;
+  const m = cfg.quarky.mode, [s1, s2] = QK_MAP[m].map(id => JOINTS.find(j => j.id === id).name), busy = anim.playing || !!anim.rec;
+  $$('[data-qk]').forEach(b => { b.classList.toggle('on', b.dataset.qk === m); b.disabled = busy; });
+  $$('.qkmap').forEach(el => el.innerHTML = `<span>Servo 1 → <b>${s1}</b></span><span>Servo 2 → <b>${s2}</b></span>` +
+    `<span class="muted">${JOINTS.filter(j => !mapped(j.id)).map(j => j.name).join(' + ')}: no servo</span>`);
+  $$('.qklock').forEach(el => el.textContent = busy ? 'Stop the animation to change mode.' : '');
+  $('#qkBadge').textContent = `QUARKY ${m} · S1 ${s1} · S2 ${s2}`;
+}
+function setHw(hw) {
+  if (hw === cfg.hw) return;
+  if (link.connected) { toast('Disconnect first, then change the hardware'); renderQk(); return; }
+  stopAnim(); stopRec();
+  cfg.hw = hw; saveCfg(); chan.us = null; chan.handover = false; state.overrides = {};
+  renderQk(); refreshJointUI(); renderAnimUI(); renderTest(); refreshPins();
+  toast(hw === 'quarky' ? 'Quarky (2 servos) — G / E choose the joints' : 'Raspberry Pi Pico H (4 servos)');
+}
 function renderMode() {
-  renderTest();
+  renderTest(); renderQk(); refreshJointUI();
   $$('#modeSeg button').forEach(b => b.className = b.dataset.mode === cfg.mode ? 'on ' + cfg.mode : '');
   const b = $('#modeBadge'); b.className = 'badge ' + cfg.mode; b.textContent = cfg.mode === 'live' ? 'LIVE' : 'SIMULATOR';
   $('#simTag').textContent = cfg.mode === 'live' ? 'currently LIVE' : 'active'; $('#simTag').className = 'tag ' + (cfg.mode === 'live' ? 'err' : 'ok');
@@ -1835,6 +2326,8 @@ function renderMode() {
    Safety system
    ===================================================================== */
 const FW_SAFE = 'armctl-usb-1.1';            // first main.py with the Pico-side limits
+const isQuarkyFw = fw => /^armctl-quarky-/.test(fw || '');
+const fwSafe = fw => isQuarkyFw(fw) || fw >= FW_SAFE;   // the Quarky sketch always has the board-side limits
 // Stops a move that would hit something. Moving out of (or not deeper into) a collision is allowed.
 function guardMotion(prev) {
   if (!cfg.safety.collide) return;
@@ -1859,7 +2352,7 @@ function safetyEvent(msg, warn = false) {
 }
 let cfgSendT = 0;
 function sendCfgSoon() { clearTimeout(cfgSendT); cfgSendT = setTimeout(() => { if (link.connected) link.send(cfgPacket(false)); }, 600); }
-const fwHasSafety = () => link.connected && link.fw >= FW_SAFE;
+const fwHasSafety = () => link.connected && fwSafe(link.fw);
 function renderSafety() {
   const S = cfg.safety, J = cfg.joints, on = (b, a = 'On', o = 'Off') => `<span class="tag ${b ? 'ok' : 'err'}">${b ? a : o}</span>`;
   const fw = !link.connected ? '<span class="tag">Not connected</span>' : fwHasSafety() ? on(true, 'Active on Pico') : '<span class="tag err">Old main.py</span>';
@@ -2135,6 +2628,7 @@ function onBind(p, el) {
   if (p.startsWith('safety.')) { ikRanges(); renderAnimUI(); renderSafety(); sendCfgSoon(); }
   if (p.startsWith('servos.') || p === 'typeSpeed.MG90S') sendCfgSoon();
   if (p.startsWith('conn.')) updateConn();
+  if (p.startsWith('quarky.pins')) { refreshQkPins(); sendCfgSoon(); }
 }
 function connHint() {
   const ok = 'serial' in navigator, t = $('#serialSupport');
@@ -2427,9 +2921,10 @@ function renderTest() {
   const row = (name, ok, okText, badText, hint = '') => `<tr><td>${name}</td><td>${ok ? tagHtml('ok', okText) : tagHtml('err', badText)}</td><td class="small muted">${ok ? '' : hint}</td></tr>`;
   $('#testConn').innerHTML =
     row('USB', link.connected, 'connected', 'not connected', 'Click <b>Connect USB</b> at the top.') +
-    row('main.py on the Pico', link.connected && !!link.fw, link.fw || 'running', link.connected ? 'no answer' : '—',
-        link.connected ? 'Upload it in <b>Settings → Upload to Pico</b>.' : '') +
-    (link.connected && link.fw && !probeOk ? row('Signal wire check', false, '', 'needs main.py 1.3', 'Upload <code>main.py</code> again in <b>Settings</b>.') : '') +
+    row(quarky() ? 'Quarky sketch' : 'main.py on the Pico', link.connected && !!link.fw, link.fw || 'running', link.connected ? 'no answer' : '—',
+        link.connected ? (quarky() ? 'Upload the Quarky sketch (<b>Settings</b>) with the Arduino IDE.' : 'Upload it in <b>Settings → Upload to Pico</b>.') : '') +
+    (quarky() ? `<tr><td>Servo mode</td><td>${tagHtml('ok', cfg.quarky.mode)}</td><td class="small muted">${QK_MODE_NAME(cfg.quarky.mode)} have a servo</td></tr>` : '') +
+    (link.connected && link.fw && !probeOk && !quarky() ? row('Signal wire check', false, '', 'needs main.py 1.3', 'Upload <code>main.py</code> again in <b>Settings</b>.') : '') +
     row('Mode', live(), 'Live', 'Simulator', 'Switch to <b>Live</b> at the top so the servos get commands.');
   const signal = s => {
     const r = test.probe[cfg.servos[s.id].pin];
@@ -2440,20 +2935,21 @@ function renderTest() {
     if (r.up === 1 && r.down === 1) return tagHtml('err', 'wire held high');
     return tagHtml('', 'unclear');
   };
-  const moved = s => test.wiggling === s.id ? '<span class="small muted">moving…</span>'
+  const moved = s => !mapped(s.id) ? `<span class="small muted">no servo in ${cfg.quarky.mode} mode</span>` : test.wiggling === s.id ? '<span class="small muted">moving…</span>'
     : test.moved[s.id] === true ? tagHtml('ok', 'moves') : test.moved[s.id] === false ? tagHtml('err', 'doesn’t move') : '<span class="small muted">not tested</span>';
   const asking = test.ask === undefined ? null : test.ask;
   $('#testServos').innerHTML = '<tr><th>Servo</th><th>Pin</th><th>Signal wire</th><th>Moves?</th><th></th></tr>' + SERVOS.map(s => `
-    <tr data-servo="${s.id}"><td><b>${s.name}</b></td><td class="mono">GP${cfg.servos[s.id].pin}</td><td>${signal(s)}</td><td>${moved(s)}</td>
+    <tr data-servo="${s.id}"><td><b>${s.name}</b></td><td class="mono">${quarky() ? (mapped(s.id) ? 'Servo ' + (channels().indexOf(s.id) + 1) : '—') : 'GP' + cfg.servos[s.id].pin}</td><td>${signal(s)}</td><td>${moved(s)}</td>
       <td><div class="acts">${asking === s.id
         ? '<button class="btn sm primary" data-t="yes">It moved</button><button class="btn sm" data-t="no">It didn’t</button>'
-        : `<button class="btn sm" data-t="wiggle"${test.wiggling ? ' disabled' : ''}>Wiggle</button>`}</div></td></tr>`).join('');
+        : `<button class="btn sm" data-t="wiggle"${test.wiggling || frozen(s.id) ? ' disabled' : ''}>Wiggle</button>`}</div></td></tr>`).join('');
   const any = Object.values(test.probe).some(r => r.up === 1 && r.down === 1);
   $('#testAsk').innerHTML = asking ? `Did the <b>${SERVOS.find(s => s.id === asking).name.toLowerCase()}</b> servo move?`
     : any ? 'A wire held high usually means the signal pin touches +3.3 V or +5 V, or the plug is turned round. Check it.' : '';
 }
 function runProbe() {
   if (!link.connected) { toast('Connect the Pico first'); return; }
+  if (quarky()) { renderTest(); return; }                 // the Quarky sketch has no signal wire check
   if (!(link.fw >= FW_PROBE)) { toast('Upload main.py again (Settings) to use the signal wire check'); return; }
   test.probing = true; renderTest();
   link.send({ t: 'probe' });
@@ -2814,6 +3310,37 @@ function download(name, text, type = 'text/plain') {
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name;
   document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
 }
+// Quarky servo ports: valid ESP32 output pins (6-11 are the flash, 34-39 input only, 1/3 the USB serial port)
+function qkPinProblems() {
+  const msgs = [], P = cfg.quarky.pins, ps = [+P.s1, +P.s2];
+  ps.forEach((g, i) => {
+    const n = `Servo ${i + 1} (SERVO${i + 1}_PIN)`;
+    if (g < 0) msgs.push(['warn', `${n}: not set yet — find it with the servo port finder.`]);
+    else if (g === 1 || g === 3) msgs.push(['err', `${n}: GPIO ${g} is the USB serial port.`]);
+    else if (g >= 6 && g <= 11) msgs.push(['err', `${n}: GPIO ${g} is wired to the ESP32's flash memory.`]);
+    else if (g >= 34 || !Number.isInteger(g)) msgs.push(['err', `${n}: GPIO ${g} can't drive a servo (input only or not an ESP32 GPIO).`]);
+    else if ([0, 2, 12, 15].includes(g)) msgs.push(['warn', `${n}: GPIO ${g} is a boot strapping pin — fine if it really is the servo port.`]);
+  });
+  if (ps[0] >= 0 && ps[0] === ps[1]) msgs.push(['err', 'Both servo ports are set to the same GPIO.']);
+  return { msgs, errors: msgs.filter(m => m[0] === 'err').length, unset: ps.some(g => g < 0) };
+}
+function refreshQkPins() {
+  if (!$('#qkPinMsgs')) return;
+  const { msgs, errors, unset } = qkPinProblems();
+  $('#qkPinMsgs').innerHTML = msgs.map(([c, m]) => `<div class="note ${c}">${esc(m)}</div>`).join('');
+  const st = $('#qkPinState'); st.textContent = errors ? 'check pins' : unset ? 'not set' : 'set'; st.className = 'tag ' + (errors ? 'err' : unset ? '' : 'ok');
+  $('#qkSketchNote').textContent = unset ? 'The servo port pins aren’t set yet (Pins tab): the sketch will stop with a message telling you to set them.' : '';
+}
+function quarkySketch() {
+  if (qkPinProblems().errors) { toast('Fix the Quarky servo pins first (Pins tab)'); return null; }
+  const pk = cfgPacket(false);
+  const body = `${pk.timeout}, { ${pk.servos.map(c => `{ ${c.min}, ${c.max}, ${c.slew} }`).join(', ')} }`;
+  let h = 0x5A17C0DE; for (const ch of body + cfg.quarky.mode) h = (Math.imul(h, 31) + ch.charCodeAt(0)) >>> 0;
+  const tag = '0x' + h.toString(16).toUpperCase().padStart(8, '0');
+  return $('#qkTemplate').textContent.replace(/^\n/, '')
+    .replace('{{SERVO1_PIN}}', String(+cfg.quarky.pins.s1)).replace('{{SERVO2_PIN}}', String(+cfg.quarky.pins.s2))
+    .replace('{{CFG}}', `{ ${tag}, ${body} }`).replace('{{TAG}}', tag);
+}
 function firmware() {
   const pk = cfgPacket(false);
   const fwCfg = { servos: pk.servos, timeout: pk.timeout };
@@ -2936,10 +3463,11 @@ async function uploadFirmware() {
   }
 }
 function renderFwTag() {
-  const tag = $('#fwTag'); if (!tag) return;
   const on = link.connected && link.fw;
-  tag.textContent = on ? 'on the Pico: ' + link.fw : 'not connected';
-  tag.className = 'tag' + (on && link.fw >= FW_SAFE ? ' ok' : '');
+  for (const tag of $$('.fwTag')) {
+    tag.textContent = on ? 'on the board: ' + link.fw : 'not connected';
+    tag.className = 'tag fwTag' + (on && fwSafe(link.fw) ? ' ok' : '');
+  }
 }
 
 /* =====================================================================
@@ -3009,6 +3537,15 @@ function setupEvents() {
   });
   // settings
   $('#fwFlash').addEventListener('click', uploadFirmware);
+  $$('[data-hw-pick]').forEach(b => b.addEventListener('click', () => setHw(b.dataset.hwPick)));
+  $$('[data-qk]').forEach(b => b.addEventListener('click', () => setQkMode(b.dataset.qk)));
+  $$('.qkSketchDl').forEach(b => b.addEventListener('click', () => {
+    const t = quarkySketch(); if (!t) return;
+    download('armctl_quarky.ino', t, 'text/plain');
+    toast(qkPinProblems().unset ? 'Sketch downloaded — set SERVO1_PIN / SERVO2_PIN before uploading' : 'armctl_quarky.ino downloaded — open it in the Arduino IDE and upload');
+  }));
+  $$('.qkFinderDl').forEach(b => b.addEventListener('click', () => { download('quarky_servo_port_finder.ino', $('#qkFinder').textContent.replace(/^\n/, ''), 'text/plain'); toast('Servo port finder downloaded'); }));
+  $('[data-dl-main]').addEventListener('click', () => $('#fwDownload').click());
   $('#fwDownload').addEventListener('click', () => { const t = firmware(); if (t) { download('main.py', t, 'text/x-python'); toast('main.py downloaded'); } });
   $('#cfgExport').addEventListener('click', () => download('armctl-settings.json', JSON.stringify(cfg, null, 2), 'application/json'));
   $('#cfgImport').addEventListener('click', () => $('#cfgFile').click());
@@ -3040,6 +3577,7 @@ function setupEvents() {
     if (k === 'home') { e.preventDefault(); setPose(homePose()); return; }
     if (k === ' ' && !e.repeat) { e.preventDefault(); anim.playing ? stopAnim() : playAnim(); return; }
     if (k === 'k' && !e.repeat) { e.preventDefault(); addKey(nextKeyTime(), state.target); toast('Keyframe added'); return; }
+    if ((k === 'g' || k === 'e') && quarky()) { e.preventDefault(); if (!e.repeat) setQkMode(k.toUpperCase()); return; }
     if (JOINTS.some(j => j.keys.includes(k)) || JOG_KEYS.includes(k)) {
       e.preventDefault();
       if (JOG_KEYS.includes(k) && !state.keys.has(k)) syncIkFromTarget();
@@ -3060,6 +3598,7 @@ function boot() {
   buildCalibration();
   buildPins();
   bindAll();
+  refreshQkPins();
   $('#speedVal').textContent = cfg.speed + ' %';
   applyTheme();
   renderMode();
