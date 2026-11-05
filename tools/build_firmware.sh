@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Builds both STEAM_CAR sketches with arduino-cli and writes _site/firmware/ + manifest.json.
+# Builds both STEAM_CAR sketches with arduino-cli and writes public/firmware/ + manifest.json (copied into dist/ by Vite).
 # Needs arduino-cli (version and ESP32 core pinned in .github/workflows/pages.yml).
 #   usage: tools/build_firmware.sh [VERSION]      (VERSION defaults to git describe)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 VERSION="${1:-$(git describe --tags --always --dirty 2>/dev/null || echo dev)}"
 FQBN=esp32:esp32:esp32
-OUT=_site
+OUT=public
 rm -rf "$OUT/firmware" build && mkdir -p build "$OUT"
 for sk in steam_car ir_sensor_finder; do
   # copy the sketch so the version header can be written next to it (no shell quoting of the version)

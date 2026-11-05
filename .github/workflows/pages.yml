@@ -1,7 +1,7 @@
 name: Build firmware and publish to GitHub Pages
 
-# Runs on every push. Builds both firmwares with a pinned arduino-cli and ESP32 core, writes
-# firmware/manifest.json, and publishes the site (index.html, vendor/, firmware/) to GitHub Pages.
+# Runs on every push. Builds both firmwares with a pinned arduino-cli and ESP32 core (into public/firmware),
+# builds the Vite + React site (dist/), and publishes dist/ to GitHub Pages.
 on:
   push:
   workflow_dispatch:
@@ -42,17 +42,21 @@ jobs:
       - name: Build firmware and manifest
         run: tools/build_firmware.sh
 
-      - name: Assemble the site
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Build the site
         run: |
-          cp index.html _site/
-          cp -r vendor _site/
-          touch _site/.nojekyll
-          ls -la _site _site/firmware
+          npm ci
+          npm run build
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: _site
+          path: dist
 
   deploy:
     needs: build

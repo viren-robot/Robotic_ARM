@@ -1,0 +1,25 @@
+{
+  "name": "steam-car",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "prebuild": "node scripts/fetch-firmware.mjs"
+  },
+  "dependencies": {
+    "@lobehub/fluent-emoji": "^5.0.1",
+    "@lobehub/icons": "^6.15.0",
+    "@lobehub/ui": "^6.15.2",
+    "motion": "^14.9.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "three": "0.160.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.2.1",
+    "vite": "^8.3.6"
+  }
+}

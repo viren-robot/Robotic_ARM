@@ -1,6 +1,9 @@
 # build output
 build/
 _site/
+dist/
+node_modules/
+public/firmware/
 *.bin
 *.elf
 *.map

@@ -2,7 +2,7 @@
 
 Control page, firmware and browser flasher for a two-wheel car built on the **STEMpedia Quarky** (classic ESP32).
 
-- **Control page** (`index.html`, one file, no build step): drive with a joystick or the keyboard, or follow a line. It talks to the car over USB with Web Serial (Chrome or Edge). A Simulator with a virtual car works without any hardware.
+- **Control page** (React + @lobehub/ui, in `src/`): drive with a joystick or the keyboard, or follow a line. It talks to the car over USB with Web Serial (Chrome or Edge). A Simulator with a virtual car works without any hardware.
 - **Car firmware** (`firmware/steam_car/steam_car.ino`): motor control, the JSON-lines protocol, and line following on the board.
 - **IR sensor finder** (`firmware/ir_sensor_finder/ir_sensor_finder.ino`): finds the GPIO pins of the line sensors.
 - **Flash firmware tab**: installs either firmware from the browser, with no Arduino IDE needed. It uses esptool-js 0.7.0, vendored in `vendor/esptool-js-0.7.0/`.
@@ -83,6 +83,18 @@ The motor code is taken unchanged from the Robot-car library's `drive()`. Its de
 - Wait a few seconds; the board restarts when its port opens. Use **Reconnect**.
 - The console should show a `hello` from `steam-car`. If you flashed the IR sensor finder, it doesn't answer the car page: flash the car firmware again.
 
+## Developing the site
+
+```sh
+npm install
+npm run dev        # http://localhost:5173
+npm run build      # dist/ (the firmware is fetched from GitHub Pages unless public/firmware exists)
+```
+
+The site is React with [@lobehub/ui](https://ui.lobehub.com/) v6, a three.js 3D view, and esptool-js 0.7.0 for flashing.
+
+Deploy: GitHub Pages builds and publishes on every push (`.github/workflows/pages.yml`; Settings → Pages → Source: GitHub Actions). Vercel builds the same project with `vercel.json` (`npm run build`), taking the firmware from the Pages site.
+
 ## Building the firmware
 
 The site is built and published by `.github/workflows/pages.yml` on every push: it compiles both sketches with arduino-cli 1.3.1 and the ESP32 core 3.3.12, writes `firmware/manifest.json` (version, build time, size, SHA-256, flash offset), and deploys to Pages. To build locally:
@@ -90,7 +102,7 @@ The site is built and published by `.github/workflows/pages.yml` on every push: 
 ```sh
 arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
 arduino-cli core update-index && arduino-cli core install esp32:esp32@3.3.12
-tools/build_firmware.sh 1.0.0      # writes _site/firmware/ and manifest.json
+tools/build_firmware.sh 1.0.0      # writes public/firmware/ and manifest.json
 ```
 
 Firmware images are written at offset `0x0` as one merged image (bootloader, partition table and application).
@@ -112,11 +124,12 @@ JSON lines, 115200 baud. The page sends one object per line; the car answers wit
 ## Repository layout
 
 ```
-index.html                       the control page (single file)
-vendor/esptool-js-0.7.0/         esptool-js 0.7.0 bundle, pinned (see VENDORED.md)
+src/                             the control page (React, @lobehub/ui, three.js)
+public/vendor/esptool-js-0.7.0/  esptool-js 0.7.0 bundle, pinned (see VENDORED.md)
+scripts/fetch-firmware.mjs       Vercel builds: fetch the firmware from the Pages site
 firmware/steam_car/              car firmware
 firmware/ir_sensor_finder/       IR sensor finder
-tools/build_firmware.sh          builds both sketches → _site/firmware/
+tools/build_firmware.sh          builds both sketches → public/firmware/
 tools/make_manifest.py           writes manifest.json (version, size, SHA-256, offsets)
 .github/workflows/pages.yml      build + publish on every push
 ```
